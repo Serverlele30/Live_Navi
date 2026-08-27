@@ -1,0 +1,9 @@
+{
+  "name": "ÖPNV Navi",
+  "short_name": "ÖPNV Navi",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0C1116",
+  "theme_color": "#0C1116",
+  "icons": []
+}
