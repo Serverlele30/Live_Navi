@@ -1,12 +1,11 @@
 const App = (() => {
-  const FAVORITES_KEY = 'oepnv-navi:favorites';
-  const LAST_STOP_KEY = 'oepnv-navi:last-stop';
-  const RECENT_SEARCHES_KEY = 'oepnv-navi:recent-searches';
+  const FAVORITES_KEY = 'oepnv-navi:db-favorites';
+  const LAST_STOP_KEY = 'oepnv-navi:db-last-stop';
+  const RECENT_SEARCHES_KEY = 'oepnv-navi:db-recent-searches';
 
   let currentStop = null;
   let departuresPollHandle = null;
   let departuresModeFilter = null;
-  let journeyModeFilter = null;
 
   let journeyFrom = null;
   let journeyTo = null;
@@ -38,7 +37,7 @@ const App = (() => {
   function saveRecentSearch(station) {
     if (!station || !station.name) return;
     const items = loadRecentSearches().filter((item) => item.id !== station.id);
-    items.unshift({ id: station.id, name: station.name, latitude: station.latitude, longitude: station.longitude });
+    items.unshift({ id: station.id, name: station.name, source: station.source });
     localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(items.slice(0, 6)));
     renderRecentSearches();
   }
@@ -97,7 +96,15 @@ const App = (() => {
       if (cardContainer) {
         const card = document.createElement('button');
         card.className = 'favorite-card';
-        card.innerHTML = `<span class="favorite-card__star">★</span><span><strong>${escapeHtml(fav.name)}</strong><small>Abfahrten anzeigen</small></span><span class="favorite-card__arrow">→</span>`;
+        card.dataset.favId = fav.id;
+        card.innerHTML = `
+          <span class="favorite-card__star">★</span>
+          <span>
+            <strong>${escapeHtml(fav.name)}</strong>
+            <small class="favorite-card__next" data-next-departure>Lade nächste Abfahrt…</small>
+          </span>
+          <span class="favorite-card__arrow">→</span>
+        `;
         card.addEventListener('click', () => selectStation(fav));
         cardContainer.appendChild(card);
       }
@@ -107,6 +114,38 @@ const App = (() => {
     if (empty) empty.hidden = favorites.length > 0;
     const home = document.getElementById('favorites-home');
     if (home) home.hidden = favorites.length === 0;
+
+    if (favorites.length > 0) loadFavoriteNextDepartures(favorites);
+  }
+
+  async function loadFavoriteNextDepartures(favorites) {
+    const stations = favorites.map((f) => ({ id: f.id, source: f.source || 'vbb', name: f.name }));
+    try {
+      const { results } = await API.getSummaryDepartures(stations);
+      results.forEach((r) => {
+        const card = document.querySelector(`.favorite-card[data-fav-id="${CSS.escape(String(r.id))}"]`);
+        if (!card) return;
+        const el = card.querySelector('[data-next-departure]');
+        if (!el) return;
+
+        if (r.error || !r.nextDeparture) {
+          el.textContent = 'Keine Abfahrt gefunden';
+          return;
+        }
+
+        const dep = r.nextDeparture;
+        const minutesUntil = dep.when ? Math.max(0, Math.round((new Date(dep.when) - new Date()) / 60000)) : null;
+        if (dep.cancelled) {
+          el.innerHTML = `<span class="favorite-card__cancelled">${escapeHtml(dep.line || '')} fällt aus</span>`;
+        } else {
+          el.textContent = `${dep.line || '?'} → ${dep.direction || ''} · ${minutesUntil != null ? minutesUntil + ' min' : ''}`;
+        }
+      });
+    } catch (err) {
+      // Stillschweigend ignorieren - die Karten zeigen dann weiterhin "Lade..."
+      // bzw. der Nutzer bekommt die Abfahrten trotzdem beim Antippen der Karte.
+      console.error('Sammel-Abfahrten-Fehler:', err.message);
+    }
   }
 
   function updateFavoriteButton() {
@@ -155,9 +194,8 @@ const App = (() => {
 
       searchDebounce = setTimeout(async () => {
         try {
-          const { locations } = await API.searchLocations(query);
-          const stops = locations.filter((l) => l.kind === 'stop');
-          renderSearchResults(results, stops, (station) => {
+          const stations = await API.searchAll(query);
+          renderSearchResults(results, stations, (station) => {
             selectStation(station);
             input.value = '';
             results.hidden = true;
@@ -178,10 +216,13 @@ const App = (() => {
     });
   }
 
-  function kindIcon(kind) {
-    if (kind === 'address') return '📍';
-    if (kind === 'poi') return '⭐';
-    return '🚏';
+  // Ein Symbol pro Ergebnis-Herkunft: VBB-Haltestelle (Nahverkehr), echter
+  // DB-Bahnhof (bundesweit), oder Adresse/POI (nur im Routenplaner relevant).
+  function resultIcon(loc) {
+    if (loc.source === 'db') return '🚉';
+    if (loc.kind === 'address') return '📍';
+    if (loc.kind === 'poi') return '⭐';
+    return '🚏'; // VBB-Haltestelle (U/S/Tram/Bus)
   }
 
   function renderSearchResults(container, locations, onSelect) {
@@ -196,7 +237,8 @@ const App = (() => {
     locations.forEach((loc) => {
       const li = document.createElement('li');
       li.className = 'search-result';
-      li.innerHTML = `<span class="search-result__icon">${kindIcon(loc.kind)}</span> ${loc.name}`;
+      const badge = loc.source === 'db' ? '<span class="search-result__badge">DB · bundesweit</span>' : '';
+      li.innerHTML = `<span class="search-result__icon">${resultIcon(loc)}</span> ${loc.name}${badge}`;
       li.addEventListener('click', () => onSelect(loc));
       container.appendChild(li);
     });
@@ -206,7 +248,7 @@ const App = (() => {
 
   function selectStation(station) {
     currentStop = station;
-    localStorage.setItem(LAST_STOP_KEY, JSON.stringify({ id: station.id, name: station.name }));
+    localStorage.setItem(LAST_STOP_KEY, JSON.stringify({ id: station.id, name: station.name, source: station.source }));
     saveRecentSearch(station);
     activateTab('departures');
     document.getElementById('board-station-name').textContent = station.name;
@@ -214,6 +256,12 @@ const App = (() => {
     document.getElementById('welcome-panel').hidden = true;
     document.getElementById('departures-view').hidden = false;
     updateFavoriteButton();
+
+    // Der Modefilter (Verkehrsmittel S/U/Tram/Bus/...) gilt nur für VBB-
+    // Haltestellen - die bundesweite DB-Anbindung unterstützt keine Filterung.
+    const modeFilterEl = document.getElementById('departures-mode-filter');
+    if (modeFilterEl) modeFilterEl.hidden = station.source === 'db';
+
     loadDepartures();
     restartDeparturesPolling();
   }
@@ -223,28 +271,39 @@ const App = (() => {
     const board = document.getElementById('departure-board');
 
     try {
-      const { departures } = await API.getDepartures(currentStop.id, {
-        modes: departuresModeFilter ? departuresModeFilter.getModesParam() : null,
-      });
+      const departures = currentStop.source === 'db'
+        ? (await API.getDbDepartures(currentStop.id)).departures
+        : (await API.getDepartures(currentStop.id, {
+            modes: departuresModeFilter ? departuresModeFilter.getModesParam() : null,
+          })).departures;
       renderDepartureBoard(departures);
     } catch (err) {
       board.innerHTML = `<div class="board-error">⚠ ${err.message}</div>`;
     }
   }
-    function renderDepartureBoard(departures) {
+
+  let lastRenderedSource = null;
+
+  function renderDepartureBoard(departures) {
     const board = document.getElementById('departure-board');
+    const source = currentStop ? currentStop.source : null;
 
     if (departures.length === 0) {
       board.innerHTML = '<div class="board-empty">Keine Abfahrten für die gewählten Verkehrsmittel in den nächsten 30 Minuten.</div>';
+      lastRenderedSource = source;
       return;
     }
 
     const existingRows = board.querySelectorAll('.flap-row');
-    if (existingRows.length !== departures.length) {
+    // Board komplett neu aufbauen, wenn sich die Anzahl ändert ODER die
+    // Quelle wechselt (VBB<->DB) - sonst blieben bei zufällig gleicher
+    // Zeilenzahl alte Klick-Handler/Klassen vom vorherigen Backend hängen.
+    if (existingRows.length !== departures.length || lastRenderedSource !== source) {
       board.innerHTML = '';
       departures.forEach((dep, i) => {
         board.appendChild(buildDepartureRow(dep, i));
       });
+      lastRenderedSource = source;
     }
 
     departures.forEach((dep, i) => {
@@ -256,8 +315,6 @@ const App = (() => {
     const row = document.createElement('div');
     row.className = 'flap-row';
     row.style.setProperty('--row-index', index);
-    row.setAttribute('role', 'button');
-    row.setAttribute('tabindex', '0');
     row.innerHTML = `
       <div class="flap-field flap-field--line">
         <span class="flap-label">Linie</span>
@@ -276,16 +333,25 @@ const App = (() => {
         <span class="flap-cell flap-cell--time" data-field="time"></span>
       </div>
     `;
-    const openModal = () => {
-      if (row.dataset.tripId) TripModal.open(row.dataset.tripId);
-    };
-    row.addEventListener('click', openModal);
-    row.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        openModal();
-      }
-    });
+
+    // Klick-für-Fahrt-Details gibt es aktuell nur für VBB-Haltestellen (kein
+    // passender Backend-Endpunkt für DB-Streckenverlauf/Zwischenhalte).
+    if (currentStop && currentStop.source !== 'db') {
+      row.setAttribute('role', 'button');
+      row.setAttribute('tabindex', '0');
+      row.classList.add('flap-row--clickable');
+      const openModal = () => {
+        if (row.dataset.tripId) TripModal.open(row.dataset.tripId);
+      };
+      row.addEventListener('click', openModal);
+      row.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openModal();
+        }
+      });
+    }
+
     return row;
   }
 
@@ -361,6 +427,10 @@ const App = (() => {
     if (tabName === 'disruptions' && !remarksLoadedOnce) {
       loadRemarks();
     }
+
+    if (tabName === 'fares' && !faresLoadedOnce) {
+      loadFares();
+    }
   }
 
   function initNearby() {
@@ -433,6 +503,78 @@ const App = (() => {
     });
   }
 
+  function initNearbyDisruptions() {
+    const btn = document.getElementById('disruptions-locate');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const container = document.getElementById('nearby-disruptions-list');
+      container.innerHTML = '<div class="board-empty">Standort wird ermittelt…</div>';
+      try {
+        const { lat, lon } = await getUserLocation();
+        container.innerHTML = '<div class="board-empty">Suche Störungen in der Nähe…</div>';
+        const { disruptions } = await API.getNearbyDisruptions({ lat, lon, distance: 1000, stops: 6 });
+        renderNearbyDisruptions(disruptions, container);
+      } catch (err) {
+        container.innerHTML = `<div class="board-error">⚠ ${err.message}</div>`;
+      }
+    });
+  }
+
+  function renderNearbyDisruptions(disruptions, container) {
+    container.innerHTML = '';
+    if (disruptions.length === 0) {
+      container.innerHTML = '<div class="board-empty">Aktuell keine Störungen in deiner Nähe bekannt.</div>';
+      return;
+    }
+    disruptions.forEach((d) => {
+      const card = document.createElement('div');
+      card.className = 'remark-card';
+      const lines = d.affectedLines.length ? `Linie${d.affectedLines.length > 1 ? 'n' : ''} ${d.affectedLines.join(', ')}` : '';
+      const stops = d.affectedStops.length ? ` · nahe ${d.affectedStops.join(', ')}` : '';
+      card.innerHTML = `
+        <div class="remark-card__summary">⚠ ${escapeHtml(d.summary || 'Hinweis')}</div>
+        <div class="remark-card__text">${escapeHtml(d.text || '')}</div>
+        <div class="remark-card__meta">${escapeHtml(lines)}${escapeHtml(stops)}</div>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  let faresLoadedOnce = false;
+
+  async function loadFares() {
+    const content = document.getElementById('fares-content');
+    const companies = document.getElementById('fares-companies');
+    try {
+      const fares = await API.getFares();
+      faresLoadedOnce = true;
+      document.getElementById('fares-stand').textContent = `Stand: ${new Date(fares.stand).toLocaleDateString('de-DE')}`;
+
+      content.innerHTML = fares.gruppen.map((gruppe) => `
+        <div class="fare-group">
+          <h3>${escapeHtml(gruppe.titel)}</h3>
+          <div class="fare-rows">
+            ${gruppe.tickets.map((t) => `
+              <div class="fare-row">
+                <div><strong>${escapeHtml(t.name)}</strong><small>${escapeHtml(t.bereich)}${t.hinweis ? ' · ' + escapeHtml(t.hinweis) : ''}</small></div>
+                <div class="fare-row__price">${t.preis.toFixed(2).replace('.', ',')} €</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+
+      companies.innerHTML = fares.unternehmen.map((u) => `
+        <a class="company-link" href="${u.url}" target="_blank" rel="noopener noreferrer">
+          <span><strong>${escapeHtml(u.name)}</strong><small>${escapeHtml(u.beschreibung)}</small></span>
+          <span class="company-link__arrow">↗</span>
+        </a>
+      `).join('');
+    } catch (err) {
+      content.innerHTML = `<div class="board-error">⚠ ${err.message}</div>`;
+    }
+  }
+
   async function loadRemarks() {
     const container = document.getElementById('remarks-list');
     container.innerHTML = '<div class="board-empty">Lade Störungsmeldungen…</div>';
@@ -465,6 +607,7 @@ const App = (() => {
       container.appendChild(card);
     });
   }
+
   function initJourneyPlanner() {
     setupJourneyInput('journey-from', (loc) => (journeyFrom = loc));
     setupJourneyInput('journey-to', (loc) => (journeyTo = loc));
@@ -514,7 +657,6 @@ const App = (() => {
         to: journeyTo,
         when: whenInput || undefined,
         arrival: journeyArrivalMode,
-        modes: journeyModeFilter ? journeyModeFilter.getModesParam() : null,
         results: 5,
       };
       lastJourneyParams = params;
@@ -544,7 +686,7 @@ const App = (() => {
         try {
           const { locations } = await API.searchLocations(query);
           renderSearchResults(results, locations, (loc) => {
-            onSelect({ id: loc.id || undefined, lat: loc.latitude, lon: loc.longitude, name: loc.name });
+            onSelect({ id: loc.id || undefined, lat: loc.latitude, lon: loc.longitude, name: loc.name, kind: loc.kind });
             input.value = loc.name;
             results.hidden = true;
           });
@@ -599,8 +741,15 @@ const App = (() => {
         })
         .join('');
 
+      const fareHtml = journey.fareEstimate && journey.fareEstimate.price != null
+        ? journey.fareEstimate.exact
+          ? `<div class="journey-fare journey-fare--exact">💶 ${journey.fareEstimate.price.toFixed(2).replace('.', ',')} € <small>(Tarifbereich ${journey.fareEstimate.zone}, Einzelfahrschein, ohne Gewähr)</small></div>`
+          : `<div class="journey-fare">💶 ca. ${journey.fareEstimate.price.toFixed(2).replace('.', ',')} € <small>(Tarifbereich ~${journey.fareEstimate.zone}, geschätzt, ohne Gewähr)</small></div>`
+        : '';
+
       card.innerHTML = `
         ${legsHtml}
+        ${fareHtml}
         <button class="journey-map-toggle" data-journey-index="${journeyIndex}">🗺️ Streckenverlauf anzeigen</button>
         <div class="journey-mini-map" id="journey-mini-map-${journeyIndex}"></div>
       `;
@@ -664,7 +813,7 @@ const App = (() => {
 
     setTimeout(() => {
       miniMapInstance = LiveMap.createMiniMap(mapEl.id, journeyWithPolylines);
-    }, 200);
+    }, 200); // Wartet auf CSS-Höhen-Transition, damit Leaflet die Größe korrekt berechnet
   }
 
   function restoreLastStop() {
@@ -681,6 +830,7 @@ const App = (() => {
     initTabs();
     initJourneyPlanner();
     initNearby();
+    initNearbyDisruptions();
     renderFavoriteChips();
     renderRecentSearches();
 
@@ -688,11 +838,6 @@ const App = (() => {
       document.getElementById('departures-mode-filter'),
       'oepnv-navi:modes:departures',
       () => loadDepartures(),
-    );
-    journeyModeFilter = ModeFilter.create(
-      document.getElementById('journey-mode-filter'),
-      'oepnv-navi:modes:journey',
-      () => {},
     );
 
     const mapModeFilter = ModeFilter.create(

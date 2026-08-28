@@ -107,6 +107,7 @@ const TripModal = (() => {
       ? 'Fahrt fällt aus'
       : `${trip.origin || ''} → ${trip.destination || ''}`;
 
+    // Mini-Karte mit dem Streckenverlauf zeichnen
     if (miniMap) { miniMap.remove(); miniMap = null; }
     if (trip.polyline) {
       setTimeout(() => {

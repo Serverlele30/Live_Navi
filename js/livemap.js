@@ -20,8 +20,8 @@ const LiveMap = (() => {
   let radarPollHandle = null;
   let tripPollHandle = null;
   let currentTripId = null;
-  let isolatedVehicleMeta = null;
-  let getModesParam = () => null;
+  let isolatedVehicleMeta = null; // { line, color, textColor } für die Banner-Anzeige
+  let getModesParam = () => null; // wird von außen (ModeFilter) gesetzt
 
   function init() {
     if (map) return;
@@ -59,6 +59,8 @@ const LiveMap = (() => {
     return geojson.features.map((f) => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
   }
 
+  // ---------- Radar-Modus (Standard: alle Fahrzeuge im Ausschnitt) ----------
+
   async function refreshRadar() {
     if (!map || mode !== 'radar') return;
     const bounds = map.getBounds();
@@ -85,6 +87,8 @@ const LiveMap = (() => {
         `<strong>${v.line || 'Linie unbekannt'}</strong><br>${v.direction || ''}<br>` +
           `<small>Nächster Halt: ${v.nextStopover || '–'}</small>`,
       );
+      // Klick auf eine Linie: isoliert sie (alle anderen Fahrzeuge ausblenden,
+      // Streckenverlauf einzeichnen, live weiterverfolgen).
       marker.on('click', () => isolateVehicle(v));
       marker.addTo(radarLayer);
     });
@@ -105,6 +109,8 @@ const LiveMap = (() => {
       radarPollHandle = null;
     }
   }
+
+  // ---------- Isolations-Modus (eine angeklickte Linie live verfolgen) ----------
 
   async function refreshIsolated() {
     if (!map || mode !== 'isolated' || !currentTripId) return;
@@ -181,6 +187,8 @@ const LiveMap = (() => {
     banner.classList.add('is-visible');
   }
 
+  // ---------- Trip-Modus (bekanntes Fahrzeug aus einer Verbindung heraus verfolgen) ----------
+
   async function refreshTrip() {
     if (!currentTripId) return;
 
@@ -234,6 +242,8 @@ const LiveMap = (() => {
     tripMarker = null;
   }
 
+  // ---------- Standort ----------
+
   function locateUser() {
     init();
     if (!navigator.geolocation) {
@@ -254,6 +264,8 @@ const LiveMap = (() => {
     );
   }
 
+  // ---------- Modus-Verwaltung ----------
+
   function setMode(newMode) {
     if (mode === newMode) return;
     if (mode === 'radar') stopRadar();
@@ -264,6 +276,7 @@ const LiveMap = (() => {
   }
 
   function startPolling() {
+    // Rückwärtskompatibler Einstieg: Karten-Tab wurde geöffnet.
     if (mode === 'radar' || mode === 'idle') startRadar();
     else if (map) setTimeout(() => map.invalidateSize(), 150);
   }
@@ -272,6 +285,8 @@ const LiveMap = (() => {
     stopRadar();
     stopTracking();
   }
+
+  // ---------- Mini-Karte für Verbindungsvorschau (Routenplaner) ----------
 
   function createMiniMap(containerId, journey) {
     const miniMap = L.map(containerId, {

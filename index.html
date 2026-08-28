@@ -127,9 +127,9 @@
         <input type="datetime-local" id="journey-when" class="journey-datetime" hidden />
       </div>
       <div class="journey-options-row">
-        <div id="journey-mode-filter" class="mode-filter"></div>
         <button id="journey-submit" class="journey-submit" type="button">Verbindungen suchen <span>→</span></button>
       </div>
+      <p class="journey-source-note">🛰 Routenplanung über unsere selbst gehostete, offene Instanz (VBB-Region)</p>
       <div id="journey-results" class="journey-results"></div>
     </section>
 
@@ -140,15 +140,32 @@
     </section>
 
     <section class="tab-panel" data-tab-panel="disruptions" hidden>
-      <div class="panel-heading"><div><span class="section-heading__eyebrow">AKTUELL</span><h1>Störungen</h1><p>Aktuelle Hinweise und Einschränkungen im Netz.</p></div></div>
-      <div id="remarks-list" class="remarks-list"><div class="board-empty-state">Störungsmeldungen werden geladen…</div></div>
+      <div class="panel-heading"><div><span class="section-heading__eyebrow">AKTUELL</span><h1>Störungen</h1><p>Ortsbezogene und netzweite Hinweise.</p></div></div>
+      <div class="disruption-section">
+        <div class="section-heading"><div><h2>In deiner Nähe</h2></div></div>
+        <button id="disruptions-locate" class="location-btn location-btn--wide">📍 Standort verwenden</button>
+        <div id="nearby-disruptions-list" class="remarks-list"><div class="board-empty-state">Nutze deinen Standort für ortsbezogene Störungen.</div></div>
+      </div>
+      <div class="disruption-section">
+        <div class="section-heading"><div><h2>Netzweit</h2></div></div>
+        <div id="remarks-list" class="remarks-list"><div class="board-empty-state">Störungsmeldungen werden geladen…</div></div>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-tab-panel="fares" hidden>
+      <div class="panel-heading"><div><span class="section-heading__eyebrow">PREISE</span><h1>Tickets</h1><p>Übliche VBB-Fahrpreise auf einen Blick.</p></div></div>
+      <div class="disclaimer-banner">⚠ Angaben ohne Gewähr – Preise können sich ändern. <span id="fares-stand"></span></div>
+      <div id="fares-content"><div class="board-empty-state">Lade Fahrpreise…</div></div>
+      <div class="section-heading"><div><h2>Tickets kaufen</h2></div></div>
+      <div id="fares-companies" class="company-links"></div>
     </section>
 
     <section class="tab-panel" data-tab-panel="more" hidden>
       <div class="panel-heading"><div><span class="section-heading__eyebrow">WEITERE FUNKTIONEN</span><h1>Mehr</h1><p>Alles, was nicht bei jeder Fahrt gebraucht wird.</p></div></div>
       <div class="more-grid">
         <button class="more-card" data-open-tab="nearby" type="button"><span>📍</span><strong>In der Nähe</strong><small>Haltestellen in deiner Umgebung</small></button>
-        <button class="more-card" data-open-tab="disruptions" type="button"><span>⚠</span><strong>Störungen</strong><small>Aktuelle Hinweise im VBB-Netz</small></button>
+        <button class="more-card" data-open-tab="disruptions" type="button"><span>⚠</span><strong>Störungen</strong><small>Ortsbezogen &amp; netzweit</small></button>
+        <button class="more-card" data-open-tab="fares" type="button"><span>🎫</span><strong>Tickets</strong><small>Preise &amp; wo kaufen</small></button>
       </div>
       <div class="recent-section">
         <div class="section-heading"><div><span class="section-heading__eyebrow">VERLAUF</span><h2>Zuletzt gesucht</h2></div><button id="clear-recent" class="text-button" type="button">Leeren</button></div>
@@ -156,6 +173,8 @@
       </div>
     </section>
   </main>
+
+  <div class="global-disclaimer">ℹ Live-Daten von VBB · Angaben ohne Gewähr</div>
 
   <nav class="mobile-nav" aria-label="Hauptnavigation mobil">
     <button class="mobile-nav__item is-active" data-tab="departures"><span>🚏</span><small>Abfahrten</small></button>
