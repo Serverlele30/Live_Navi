@@ -50,6 +50,39 @@ button {
   outline-offset: 2px;
 }
 
+/* Visuell versteckt, aber für Screenreader normal vorlesbar - Standardmuster
+   für z.B. die Klartext-Alternative zur Flip-Animation der Abfahrtstafel. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* "Zum Inhalt springen" - für Tastatur-/Screenreader-Nutzer, die sonst bei
+   jedem Seitenaufruf erst durch Header+Suche+Navigation tabben müssten, bevor
+   sie beim eigentlichen Inhalt sind. Unsichtbar, bis es per Tab fokussiert wird. */
+.skip-link {
+  position: absolute;
+  top: -60px;
+  left: 12px;
+  z-index: 2000;
+  background: var(--signal-amber);
+  color: #17110a;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 8px;
+  transition: top 0.15s ease;
+}
+.skip-link:focus {
+  top: 12px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
@@ -135,8 +168,11 @@ button {
 }
 
 .search-result:hover,
-.search-result:focus {
+.search-result:focus,
+.search-result--active {
   background: var(--panel);
+  outline: 2px solid var(--signal-amber);
+  outline-offset: -2px;
 }
 
 .search-result--empty {
@@ -182,15 +218,66 @@ button {
   margin: 0;
 }
 
+/* Störungsbenachrichtigungen-Karte auf dem Favoriten-Tab - bewusst als
+   eigenständige, einladende Karte statt eines unauffälligen Text-Links,
+   da das eine der nützlichsten Funktionen der App ist. */
+.notify-callout {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(245,166,35,.08);
+  border: 1px solid rgba(245,166,35,.35);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+.notify-callout__icon { font-size: 26px; flex-shrink: 0; }
+.notify-callout__text { flex: 1; min-width: 0; }
+.notify-callout__text strong { display: block; font-size: 14px; }
+.notify-callout__text small { display: block; color: var(--ink-muted); font-size: 12px; margin-top: 2px; }
+.notify-callout__btn {
+  flex-shrink: 0;
+  background: var(--signal-amber);
+  color: #17110a;
+  font-weight: 600;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 13px;
+}
+.notify-callout__btn:hover { filter: brightness(1.08); }
+.notify-callout__btn:disabled { cursor: default; }
+
+.notify-callout--active {
+  background: rgba(61,220,132,.08);
+  border-color: rgba(61,220,132,.35);
+}
+.notify-callout--active .notify-callout__btn {
+  background: var(--signal-green);
+  color: #06301b;
+}
+
+.notify-callout--blocked {
+  background: rgba(255,93,108,.08);
+  border-color: rgba(255,93,108,.35);
+}
+.notify-callout--blocked .notify-callout__btn {
+  background: var(--panel-raised);
+  color: var(--ink-muted);
+}
+
 /* ============================================================
    Tabs
    ============================================================ */
 
 .tab-nav {
-  display: flex;
-  gap: 4px;
   padding: 0 20px;
   border-bottom: 1px solid var(--line);
+}
+
+.tab-nav__list {
+  display: flex;
+  gap: 4px;
 }
 
 .tab-button {
@@ -248,6 +335,15 @@ button {
   border-color: var(--signal-amber);
 }
 
+@keyframes favorite-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+.favorite-toggle.is-active {
+  animation: favorite-pop .3s ease;
+}
+
 .board-empty-state,
 .board-empty,
 .board-error {
@@ -263,6 +359,27 @@ button {
   color: var(--signal-red);
 }
 
+.board-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.board-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.board-error .text-button {
+  border: 1px solid var(--signal-red);
+  border-radius: 999px;
+  padding: 6px 16px;
+  color: var(--signal-red);
+}
+.board-error .text-button:hover { background: rgba(255,93,108,.1); }
+
 .departure-board {
   display: flex;
   flex-direction: column;
@@ -276,10 +393,31 @@ button {
   align-items: center;
   background: var(--panel);
   border: 1px solid var(--line);
+  border-left: 4px solid var(--line-color, var(--line));
   border-radius: var(--radius);
-  padding: 14px 16px;
+  padding: 14px 16px 14px 13px;
   font-family: var(--font-display);
+  animation: flap-row-in .25s ease both;
+  animation-delay: calc(var(--row-index, 0) * 25ms);
 }
+
+@keyframes flap-row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Gleicher dezenter Eintritts-Effekt für andere Karten-Listen (Favoriten,
+   Routenergebnisse) - per nth-child gestaffelt, da diese keine --row-index
+   Variable aus JS mitbekommen. */
+.favorite-card,
+.journey-card {
+  animation: flap-row-in .25s ease both;
+}
+.favorite-cards > :nth-child(1), .journey-results > :nth-child(1) { animation-delay: 0ms; }
+.favorite-cards > :nth-child(2), .journey-results > :nth-child(2) { animation-delay: 40ms; }
+.favorite-cards > :nth-child(3), .journey-results > :nth-child(3) { animation-delay: 80ms; }
+.favorite-cards > :nth-child(4), .journey-results > :nth-child(4) { animation-delay: 120ms; }
+.favorite-cards > :nth-child(5), .journey-results > :nth-child(5) { animation-delay: 160ms; }
 
 .flap-row--delayed .flap-cell--time {
   color: var(--signal-red);
@@ -911,7 +1049,20 @@ button:active { transform: translateY(1px); }
   background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 16px;
 }
 .action-card:hover { border-color: var(--signal-amber); background: var(--panel-raised); }
-.action-card--primary { border-color: rgba(245,166,35,.45); }
+
+/* Dezenter "Lift"-Effekt beim Hover für Karten-Buttons - macht sie klickbarer
+   greifbar, ohne das Layout zu beeinflussen (nur Transform+Schatten). */
+.action-card,
+.more-card,
+.favorite-card {
+  transition: border-color .15s ease, background .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+.action-card:hover,
+.more-card:hover,
+.favorite-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,.28);
+}.action-card--primary { border-color: rgba(245,166,35,.45); }
 .action-card__icon { font-size: 23px; }
 .action-card strong, .action-card small { display: block; }
 .action-card small { color: var(--ink-muted); margin-top: 3px; font-size: 12px; }
@@ -982,6 +1133,7 @@ button:active { transform: translateY(1px); }
 .toast.is-visible { opacity: 1; transform: translateY(0); }
 .toast--warning { border-left-color: var(--signal-red); }
 .toast--info { border-left-color: var(--signal-amber); }
+.toast--success { border-left-color: var(--signal-green); }
 .nearby-preview { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
 .nearby-preview__item {
   display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left;
@@ -998,7 +1150,7 @@ button:active { transform: translateY(1px); }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--signal-green); box-shadow: 0 0 0 3px rgba(61,220,132,.12); }
 .favorite-toggle { padding: 8px 12px; }
 
-.flap-row { grid-template-columns: 82px minmax(0,1fr) 82px 112px; padding: 14px 16px; }
+.flap-row { grid-template-columns: 82px minmax(0,1fr) 82px 112px; padding: 14px 16px 14px 13px; }
 .flap-cell--time { font-size: 17px; }
 .flap-cell--direction { font-size: 15px; font-weight: 600; }
 .flap-cell--platform { font-size: 14px; }
@@ -1765,13 +1917,14 @@ button:active { transform: translateY(1px); }
   .journey-options-row .mode-filter { margin-bottom: 8px; }
   .transfer-slack-field select { width: 100%; }
   .mobile-nav {
-    display: grid; grid-template-columns: repeat(4, 1fr); position: fixed; bottom: 0; left: 0; right: 0;
+    display: block; position: fixed; bottom: 0; left: 0; right: 0;
     /* Muss über der (jetzt display-breiten) Live-Karte liegen - Leaflet nutzt
        für seine eigenen Steuerelemente (Zoom-Buttons etc.) intern z-index-
        Werte bis ~1000, das HUD/die Navigation soll aber immer sichtbar und
        bedienbar bleiben, unabhängig von der Karte. */
     z-index: 1100; background: rgba(23,30,38,.97); border-top: 1px solid var(--line); padding: 5px 4px calc(5px + env(safe-area-inset-bottom));
   }
+  .mobile-nav__list { display: grid; grid-template-columns: repeat(4, 1fr); }
   .mobile-nav__item { border: 0; background: transparent; color: var(--ink-muted); padding: 5px 2px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
   .mobile-nav__item span { font-size: 18px; line-height: 1.1; }
   .mobile-nav__item small { font-size: 10px; }
@@ -1783,6 +1936,8 @@ button:active { transform: translateY(1px); }
   .flap-row { grid-template-columns: 58px minmax(0,1fr) 72px; gap: 12px; }
   .flap-field--platform { display: none; }
   .flap-field--time { grid-column: 3; }
+  .notify-callout { flex-wrap: wrap; }
+  .notify-callout__btn { width: 100%; }
 }
 
 .journey-source-note {

@@ -17,6 +17,8 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <a class="skip-link" href="#main-content" data-i18n="a11y.skipLink">Zum Inhalt springen</a>
+
   <header class="app-header">
     <button class="brand" data-tab="departures" aria-label="Zur Startseite">
       <span class="brand__mark">ÖPNV</span><span class="brand__mark brand__mark--accent">NAVI</span>
@@ -24,34 +26,36 @@
 
     <div class="search-box search-box--global">
       <span class="search-box__icon" aria-hidden="true">⌕</span>
-      <input type="text" id="station-search" placeholder="Haltestelle, Ort oder Ziel suchen…" data-i18n-placeholder="search.placeholder" autocomplete="off" aria-label="Haltestelle, Ort oder Ziel suchen" data-i18n-aria-label="search.placeholder" />
+      <input type="text" id="station-search" placeholder="Haltestelle, Ort oder Ziel suchen…" data-i18n-placeholder="search.placeholder" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="search-results" aria-autocomplete="list" aria-label="Haltestelle, Ort oder Ziel suchen" data-i18n-aria-label="search.placeholder" />
       <button id="search-clear" class="search-clear" type="button" aria-label="Suche leeren" data-i18n-aria-label="search.clear" hidden>×</button>
-      <ul id="search-results" class="search-results" hidden></ul>
+      <ul id="search-results" class="search-results" role="listbox" aria-label="Suchergebnisse" data-i18n-aria-label="search.resultsLabel" hidden></ul>
     </div>
 
     <button id="header-favorites-btn" class="header-icon-btn" data-tab="favorites" type="button" title="Favoriten" data-i18n-title="nav.favorites" aria-label="Favoriten" data-i18n-aria-label="nav.favorites">★</button>
   </header>
 
   <nav class="tab-nav" aria-label="Hauptnavigation">
-    <button class="tab-button is-active" data-tab="departures"><span class="tab-button__icon">🚏</span> <span data-i18n="nav.departures">Abfahrten</span></button>
-    <button class="tab-button" data-tab="journey"><span class="tab-button__icon">🧭</span> <span data-i18n="nav.route">Route</span></button>
-    <button class="tab-button" data-tab="map"><span class="tab-button__icon">🗺</span> <span data-i18n="nav.map">Karte</span></button>
-    <button class="tab-button" data-tab="more"><span class="tab-button__icon">☰</span> <span data-i18n="nav.more">Mehr</span></button>
+    <div role="tablist" aria-label="Hauptnavigation" class="tab-nav__list">
+      <button class="tab-button is-active" role="tab" aria-selected="true" aria-controls="panel-departures" id="tab-departures" tabindex="0" data-tab="departures"><span class="tab-button__icon" aria-hidden="true">🚏</span> <span data-i18n="nav.departures">Abfahrten</span></button>
+      <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-journey" id="tab-journey" tabindex="-1" data-tab="journey"><span class="tab-button__icon" aria-hidden="true">🧭</span> <span data-i18n="nav.route">Route</span></button>
+      <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-map" id="tab-map" tabindex="-1" data-tab="map"><span class="tab-button__icon" aria-hidden="true">🗺</span> <span data-i18n="nav.map">Karte</span></button>
+      <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-more" id="tab-more" tabindex="-1" data-tab="more"><span class="tab-button__icon" aria-hidden="true">☰</span> <span data-i18n="nav.more">Mehr</span></button>
+    </div>
   </nav>
 
-  <main class="app-main">
-    <section class="tab-panel" data-tab-panel="departures">
+  <main class="app-main" id="main-content">
+    <section class="tab-panel" data-tab-panel="departures" id="panel-departures" role="tabpanel" aria-labelledby="tab-departures mobile-tab-departures" tabindex="-1">
       <div class="welcome-panel" id="welcome-panel">
         <div class="welcome-panel__eyebrow">LIVE · VBB</div>
         <h1 data-i18n="welcome.title">Was fährt jetzt?</h1>
         <p data-i18n="welcome.text">Suche eine Haltestelle oder nutze deinen Standort, um die nächsten Abfahrten zu sehen.</p>
         <div class="welcome-actions">
           <button id="welcome-nearby" class="action-card action-card--primary" type="button">
-            <span class="action-card__icon">📍</span>
+            <span class="action-card__icon" aria-hidden="true">📍</span>
             <span><strong data-i18n="welcome.nearbyTitle">In meiner Nähe</strong><small data-i18n="welcome.nearbyText">Haltestellen im Umkreis finden</small></span>
           </button>
           <button id="welcome-route" class="action-card" type="button">
-            <span class="action-card__icon">🧭</span>
+            <span class="action-card__icon" aria-hidden="true">🧭</span>
             <span><strong data-i18n="welcome.routeTitle">Route planen</strong><small data-i18n="welcome.routeText">Von A nach B mit Bus &amp; Bahn</small></span>
           </button>
         </div>
@@ -73,58 +77,58 @@
           </div>
           <button id="favorite-toggle" class="favorite-toggle" hidden>☆ <span data-i18n="favorites.favorite">Favorit</span></button>
         </div>
-        <div id="board-status" class="board-status" aria-live="polite"><span class="status-dot"></span> <span data-i18n="departures.refreshInfo">Aktualisierung alle 30 Sekunden</span></div>
+        <div id="board-status" class="board-status" aria-live="polite"><span class="status-dot" aria-hidden="true"></span> <span data-i18n="departures.refreshInfo">Aktualisierung alle 30 Sekunden</span></div>
         <div id="departures-mode-filter" class="mode-filter"></div>
-        <div id="departure-board" class="departure-board" role="table" aria-label="Abfahrtstafel"></div>
+        <div id="departure-board" class="departure-board" role="list" aria-label="Abfahrtstafel"></div>
         <div id="board-empty-state" class="board-empty-state" data-i18n="departures.emptyState">Suche oben eine Haltestelle, um Live-Abfahrten zu sehen.</div>
-        <div id="elevator-status" class="elevator-status" hidden></div>
-        <div id="station-disruption" class="station-disruption" hidden></div>
+        <div id="elevator-status" class="elevator-status" aria-live="polite" hidden></div>
+        <div id="station-disruption" class="station-disruption" aria-live="polite" hidden></div>
       </div>
     </section>
 
-    <section class="tab-panel" data-tab-panel="map" hidden>
+    <section class="tab-panel" data-tab-panel="map" id="panel-map" role="tabpanel" aria-labelledby="tab-map mobile-tab-map" tabindex="-1" hidden>
       <div class="panel-heading"><div><span class="section-heading__eyebrow" data-i18n="common.live">LIVE</span><h1 data-i18n="map.title">Karte</h1><p data-i18n="map.text">Fahrzeuge, Routen und deine aktuelle Fahrt live verfolgen.</p></div></div>
       <div class="map-controls">
         <div id="map-mode-filter" class="mode-filter"></div>
         <button id="map-locate" class="map-locate-btn" type="button">📍 <span data-i18n="map.locate">Mein Standort</span></button>
       </div>
-      <div id="map-isolation-banner" class="map-isolation-banner">
+      <div id="map-isolation-banner" class="map-isolation-banner" aria-live="polite">
         <span><span data-i18n="map.following">Verfolge Linie</span> <span id="map-isolation-line" class="map-isolation-banner__line"></span> <span data-i18n="map.live">live</span></span>
         <button id="map-isolation-reset" type="button" data-i18n="map.showAllLines">Alle Linien anzeigen</button>
       </div>
-      <div id="live-map" class="live-map"></div>
+      <div id="live-map" class="live-map" role="application" aria-label="Live-Karte mit Fahrzeugpositionen. Für Screenreader-Nutzer eingeschränkt zugänglich - Details zu einzelnen Fahrten sind über die Abfahrtstafel und den Routenplaner verfügbar." data-i18n-aria-label="map.a11yDescription"></div>
     </section>
 
-    <section class="tab-panel" data-tab-panel="journey" hidden>
+    <section class="tab-panel" data-tab-panel="journey" id="panel-journey" role="tabpanel" aria-labelledby="tab-journey mobile-tab-journey" tabindex="-1" hidden>
       <div class="panel-heading"><div><span class="section-heading__eyebrow" data-i18n="journey.eyebrow">VERBINDUNG SUCHEN</span><h1 data-i18n="journey.title">Wohin möchtest du?</h1><p data-i18n="journey.text">Starte mit deinem Standort oder suche einen Ausgangspunkt.</p></div></div>
       <div class="journey-card-form">
         <div class="journey-input-row">
-          <div class="journey-input-marker journey-input-marker--start">●</div>
+          <div class="journey-input-marker journey-input-marker--start" aria-hidden="true">●</div>
           <div class="search-box">
-            <input type="text" id="journey-from" placeholder="Mein Standort oder Start…" data-i18n-placeholder="journey.fromPlaceholder" autocomplete="off" />
-            <ul id="journey-from-results" class="search-results" hidden></ul>
+            <input type="text" id="journey-from" placeholder="Mein Standort oder Start…" data-i18n-placeholder="journey.fromPlaceholder" aria-label="Start der Route" data-i18n-aria-label="journey.fromPlaceholder" role="combobox" aria-expanded="false" aria-controls="journey-from-results" aria-autocomplete="list" autocomplete="off" />
+            <ul id="journey-from-results" class="search-results" role="listbox" aria-label="Vorschläge für Start" hidden></ul>
           </div>
           <button id="journey-use-location" class="location-btn" title="Meinen Standort verwenden" data-i18n-title="journey.useLocation" aria-label="Meinen Standort verwenden" data-i18n-aria-label="journey.useLocation">📍</button>
         </div>
-        <div class="journey-connector"></div>
+        <div class="journey-connector" aria-hidden="true"></div>
         <div class="journey-input-row">
-          <div class="journey-input-marker journey-input-marker--end">●</div>
+          <div class="journey-input-marker journey-input-marker--end" aria-hidden="true">●</div>
           <div class="search-box">
-            <input type="text" id="journey-to" placeholder="Wohin?" data-i18n-placeholder="journey.toPlaceholder" autocomplete="off" />
-            <ul id="journey-to-results" class="search-results" hidden></ul>
+            <input type="text" id="journey-to" placeholder="Wohin?" data-i18n-placeholder="journey.toPlaceholder" aria-label="Ziel der Route" data-i18n-aria-label="journey.toPlaceholder" role="combobox" aria-expanded="false" aria-controls="journey-to-results" aria-autocomplete="list" autocomplete="off" />
+            <ul id="journey-to-results" class="search-results" role="listbox" aria-label="Vorschläge für Ziel" hidden></ul>
           </div>
         </div>
       </div>
 
-      <div class="journey-when">
-        <button class="when-choice is-active" data-when="now" type="button">● <span data-i18n="journey.now">Jetzt</span></button>
-        <button class="when-choice" data-when="departure" type="button" data-i18n="journey.departureAt">Abfahrt um</button>
-        <button class="when-choice" data-when="arrival" type="button" data-i18n="journey.arrivalAt">Ankunft um</button>
-        <input type="datetime-local" id="journey-when" class="journey-datetime" hidden />
+      <div class="journey-when" role="group" aria-label="Zeitpunkt der Fahrt">
+        <button class="when-choice is-active" data-when="now" type="button" aria-pressed="true">● <span data-i18n="journey.now">Jetzt</span></button>
+        <button class="when-choice" data-when="departure" type="button" aria-pressed="false" data-i18n="journey.departureAt">Abfahrt um</button>
+        <button class="when-choice" data-when="arrival" type="button" aria-pressed="false" data-i18n="journey.arrivalAt">Ankunft um</button>
+        <input type="datetime-local" id="journey-when" class="journey-datetime" aria-label="Datum und Uhrzeit" hidden />
       </div>
       <label class="wheelchair-toggle">
         <input type="checkbox" id="journey-wheelchair" />
-        <span>♿ <span data-i18n="journey.wheelchair">Nur rollstuhlgerechte Verbindungen</span></span>
+        <span><span aria-hidden="true">♿</span> <span data-i18n="journey.wheelchair">Nur rollstuhlgerechte Verbindungen</span></span>
       </label>
       <div class="journey-options-row">
         <div class="transfer-slack-field">
@@ -138,13 +142,13 @@
             <option value="15" data-i18n="journey.transferSlack15">15 min (sicher)</option>
           </select>
         </div>
-        <button id="journey-submit" class="journey-submit" type="button"><span data-i18n="journey.submit">Verbindungen suchen</span> <span>→</span></button>
+        <button id="journey-submit" class="journey-submit" type="button"><span data-i18n="journey.submit">Verbindungen suchen</span> <span aria-hidden="true">→</span></button>
       </div>
       <p class="journey-source-note" data-i18n="journey.sourceNote">🛰 Routenplanung über unsere selbst gehostete, offene Instanz (VBB-Region)</p>
       <div id="journey-share-row" class="journey-share-row" hidden>
-        <button id="journey-share-btn" class="text-button" type="button">🔗 <span data-i18n="journey.share">Route teilen</span></button>
+        <button id="journey-share-btn" class="text-button" type="button"><span aria-hidden="true">🔗</span> <span data-i18n="journey.share">Route teilen</span></button>
       </div>
-      <div id="journey-results" class="journey-results"></div>
+      <div id="journey-results" class="journey-results" aria-live="polite"></div>
     </section>
 
     <section class="tab-panel" data-tab-panel="nearby" hidden>
@@ -158,12 +162,16 @@
         <div><span class="section-heading__eyebrow" data-i18n="favorites.eyebrow">SCHNELLZUGRIFF</span><h1 data-i18n="favorites.title">Meine Haltestellen</h1><p data-i18n="favorites.text">Deine gespeicherten Haltestellen mit Live-Abfahrten und Störungshinweisen.</p></div>
       </div>
       <div id="favorites-home" class="home-section">
-        <div class="section-heading">
-          <div></div>
-          <button id="notify-toggle" class="text-button" type="button" hidden>🔔 <span data-i18n="favorites.enableNotify">Störungsbenachrichtigungen aktivieren</span></button>
+        <div id="notify-callout" class="notify-callout" hidden>
+          <div class="notify-callout__icon" aria-hidden="true">🔔</div>
+          <div class="notify-callout__text">
+            <strong data-i18n="favorites.enableNotifyTitle">Störungen sofort mitbekommen</strong>
+            <small data-i18n="favorites.enableNotifyText">Auch wenn die App gerade nicht offen ist.</small>
+          </div>
+          <button id="notify-toggle" class="notify-callout__btn" type="button" data-i18n="favorites.enableNotifyShort">Aktivieren</button>
         </div>
         <p id="favorites-empty-hint" class="favorites-empty-hint" data-i18n="favorites.emptyHint">Noch keine Favoriten - tippe bei einer Haltestelle auf ☆, um sie hier anzupinnen.</p>
-        <div id="favorite-cards" class="favorite-cards"></div>
+        <div id="favorite-cards" class="favorite-cards" role="list"></div>
       </div>
     </section>
 
@@ -172,39 +180,39 @@
       <div class="disruption-section">
         <div class="section-heading"><div><h2 data-i18n="disruptions.nearbyTitle">In deiner Nähe</h2></div></div>
         <button id="disruptions-locate" class="location-btn location-btn--wide">📍 <span data-i18n="disruptions.useLocation">Standort verwenden</span></button>
-        <div id="nearby-disruptions-list" class="remarks-list"><div class="board-empty-state" data-i18n="disruptions.nearbyEmpty">Nutze deinen Standort für ortsbezogene Störungen.</div></div>
+        <div id="nearby-disruptions-list" class="remarks-list" aria-live="polite"><div class="board-empty-state" data-i18n="disruptions.nearbyEmpty">Nutze deinen Standort für ortsbezogene Störungen.</div></div>
       </div>
       <div class="disruption-section">
         <div class="section-heading"><div><h2 data-i18n="disruptions.networkTitle">Netzweit</h2></div></div>
-        <div id="remarks-list" class="remarks-list"><div class="board-empty-state" data-i18n="disruptions.loading">Störungsmeldungen werden geladen…</div></div>
+        <div id="remarks-list" class="remarks-list" aria-live="polite"><div class="board-empty-state" data-i18n="disruptions.loading">Störungsmeldungen werden geladen…</div></div>
       </div>
     </section>
 
     <section class="tab-panel" data-tab-panel="fares" hidden>
       <div class="panel-heading"><div><span class="section-heading__eyebrow" data-i18n="fares.eyebrow">PREISE</span><h1 data-i18n="fares.title">Tickets</h1><p data-i18n="fares.text">Übliche VBB-Fahrpreise auf einen Blick.</p></div></div>
-      <div class="disclaimer-banner">⚠ <span data-i18n="fares.disclaimer">Angaben ohne Gewähr – Preise können sich ändern.</span> <span id="fares-stand"></span></div>
+      <div class="disclaimer-banner"><span aria-hidden="true">⚠</span> <span data-i18n="fares.disclaimer">Angaben ohne Gewähr – Preise können sich ändern.</span> <span id="fares-stand"></span></div>
       <div id="fares-content"><div class="board-empty-state" data-i18n="fares.loading">Lade Fahrpreise…</div></div>
       <div class="section-heading"><div><h2 data-i18n="fares.buyTitle">Tickets kaufen</h2></div></div>
       <div id="fares-companies" class="company-links"></div>
     </section>
 
-    <section class="tab-panel" data-tab-panel="more" hidden>
+    <section class="tab-panel" data-tab-panel="more" id="panel-more" role="tabpanel" aria-labelledby="tab-more mobile-tab-more" tabindex="-1" hidden>
       <div class="panel-heading"><div><span class="section-heading__eyebrow" data-i18n="more.eyebrow">WEITERE FUNKTIONEN</span><h1 data-i18n="nav.more">Mehr</h1><p data-i18n="more.text">Alles, was nicht bei jeder Fahrt gebraucht wird.</p></div></div>
       <div class="more-grid">
-        <button class="more-card" data-open-tab="favorites" type="button"><span>★</span><strong data-i18n="favorites.title">Favoriten</strong><small data-i18n="more.favoritesText">Deine gespeicherten Haltestellen</small></button>
-        <button class="more-card" data-open-tab="nearby" type="button"><span>📍</span><strong data-i18n="nearby.title">In der Nähe</strong><small data-i18n="more.nearbyText">Haltestellen in deiner Umgebung</small></button>
-        <button class="more-card" data-open-tab="disruptions" type="button"><span>⚠</span><strong data-i18n="disruptions.title">Störungen</strong><small data-i18n="more.disruptionsText">Ortsbezogen &amp; netzweit</small></button>
-        <button class="more-card" data-open-tab="fares" type="button"><span>🎫</span><strong data-i18n="fares.title">Tickets</strong><small data-i18n="more.faresText">Preise &amp; wo kaufen</small></button>
+        <button class="more-card" data-open-tab="favorites" type="button"><span aria-hidden="true">★</span><strong data-i18n="favorites.title">Favoriten</strong><small data-i18n="more.favoritesText">Deine gespeicherten Haltestellen</small></button>
+        <button class="more-card" data-open-tab="nearby" type="button"><span aria-hidden="true">📍</span><strong data-i18n="nearby.title">In der Nähe</strong><small data-i18n="more.nearbyText">Haltestellen in deiner Umgebung</small></button>
+        <button class="more-card" data-open-tab="disruptions" type="button"><span aria-hidden="true">⚠</span><strong data-i18n="disruptions.title">Störungen</strong><small data-i18n="more.disruptionsText">Ortsbezogen &amp; netzweit</small></button>
+        <button class="more-card" data-open-tab="fares" type="button"><span aria-hidden="true">🎫</span><strong data-i18n="fares.title">Tickets</strong><small data-i18n="more.faresText">Preise &amp; wo kaufen</small></button>
       </div>
       <div class="recent-section">
         <div class="section-heading"><div><span class="section-heading__eyebrow" data-i18n="more.historyEyebrow">VERLAUF</span><h2 data-i18n="more.historyTitle">Zuletzt gesucht</h2></div><button id="clear-recent" class="text-button" type="button" data-i18n="common.clear">Leeren</button></div>
-        <div id="recent-searches" class="recent-searches"></div>
+        <div id="recent-searches" class="recent-searches" role="list"></div>
       </div>
       <div class="recent-section">
         <div class="section-heading"><div><span class="section-heading__eyebrow" data-i18n="more.langEyebrow">SPRACHE / LANGUAGE</span><h2 data-i18n="more.langTitle">Sprache</h2></div></div>
-        <div class="lang-switch">
-          <button id="lang-de" class="lang-switch__btn" type="button" data-lang="de">Deutsch</button>
-          <button id="lang-en" class="lang-switch__btn" type="button" data-lang="en">English</button>
+        <div class="lang-switch" role="group" aria-label="Sprache / Language">
+          <button id="lang-de" class="lang-switch__btn" type="button" data-lang="de" aria-pressed="true">Deutsch</button>
+          <button id="lang-en" class="lang-switch__btn" type="button" data-lang="en" aria-pressed="false">English</button>
         </div>
       </div>
     </section>
@@ -213,10 +221,12 @@
   <div class="global-disclaimer" data-i18n="common.footer">ℹ Live-Daten von VBB · Angaben ohne Gewähr</div>
 
   <nav class="mobile-nav" aria-label="Hauptnavigation mobil">
-    <button class="mobile-nav__item is-active" data-tab="departures"><span>🚏</span><small data-i18n="nav.departures">Abfahrten</small></button>
-    <button class="mobile-nav__item" data-tab="journey"><span>🧭</span><small data-i18n="nav.route">Route</small></button>
-    <button class="mobile-nav__item" data-tab="map"><span>🗺</span><small data-i18n="nav.map">Karte</small></button>
-    <button class="mobile-nav__item" data-tab="more"><span>☰</span><small data-i18n="nav.more">Mehr</small></button>
+    <div role="tablist" aria-label="Hauptnavigation mobil" class="mobile-nav__list">
+      <button class="mobile-nav__item is-active" role="tab" aria-selected="true" aria-controls="panel-departures" id="mobile-tab-departures" tabindex="0" data-tab="departures"><span aria-hidden="true">🚏</span><small data-i18n="nav.departures">Abfahrten</small></button>
+      <button class="mobile-nav__item" role="tab" aria-selected="false" aria-controls="panel-journey" id="mobile-tab-journey" tabindex="-1" data-tab="journey"><span aria-hidden="true">🧭</span><small data-i18n="nav.route">Route</small></button>
+      <button class="mobile-nav__item" role="tab" aria-selected="false" aria-controls="panel-map" id="mobile-tab-map" tabindex="-1" data-tab="map"><span aria-hidden="true">🗺</span><small data-i18n="nav.map">Karte</small></button>
+      <button class="mobile-nav__item" role="tab" aria-selected="false" aria-controls="panel-more" id="mobile-tab-more" tabindex="-1" data-tab="more"><span aria-hidden="true">☰</span><small data-i18n="nav.more">Mehr</small></button>
+    </div>
   </nav>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

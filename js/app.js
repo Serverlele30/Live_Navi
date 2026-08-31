@@ -125,6 +125,7 @@ const App = (() => {
   function toggleFavorite(station) {
     const favorites = loadFavorites();
     const idx = favorites.findIndex((f) => f.id === station.id);
+    const wasAdded = idx < 0;
     if (idx >= 0) {
       favorites.splice(idx, 1);
     } else {
@@ -135,6 +136,7 @@ const App = (() => {
     renderRecentSearches();
     updateFavoriteButton();
     if (window.Push) Push.syncFavorites(favorites);
+    showToast(wasAdded ? `★ ${station.name} zu Favoriten hinzugefügt` : `☆ ${station.name} aus Favoriten entfernt`, 'success');
   }
 
   function renderFavoriteChips() {
@@ -314,23 +316,24 @@ const App = (() => {
 
   function updateNotifyToggleVisibility(hasFavorites) {
     const btn = document.getElementById('notify-toggle');
-    if (!btn) return;
+    const callout = document.getElementById('notify-callout');
+    if (!btn || !callout) return;
     if (!hasFavorites || !window.Notification) {
-      btn.hidden = true;
+      callout.hidden = true;
       return;
     }
-    btn.hidden = false;
+    callout.hidden = false;
+    callout.classList.remove('notify-callout--active', 'notify-callout--blocked');
     if (Notification.permission === 'granted') {
-      btn.textContent = `🔔 ${I18N.t('favorites.notifyActive')}`;
-      btn.classList.add('is-active');
+      btn.textContent = I18N.t('favorites.notifyActiveShort');
+      callout.classList.add('notify-callout--active');
       btn.disabled = true;
     } else if (Notification.permission === 'denied') {
-      btn.textContent = `🔕 ${I18N.t('favorites.notifyBlocked')}`;
-      btn.classList.remove('is-active');
+      btn.textContent = I18N.t('favorites.notifyBlockedShort');
+      callout.classList.add('notify-callout--blocked');
       btn.disabled = true;
     } else {
-      btn.textContent = `🔔 ${I18N.t('favorites.enableNotify')}`;
-      btn.classList.remove('is-active');
+      btn.textContent = I18N.t('favorites.enableNotifyShort');
       btn.disabled = false;
     }
   }
@@ -389,10 +392,12 @@ const App = (() => {
   }
 
   let searchDebounce = null;
+  let searchRequestId = 0;
 
   function initSearch() {
     const input = document.getElementById('station-search');
     const results = document.getElementById('search-results');
+    wireSearchKeyboardNav(input, results);
 
     // Leeres Suchfeld antippen: zuletzt gesuchte Haltestellen als Vorschläge
     // zeigen, statt dass man erst tippen muss, um überhaupt etwas zu sehen.
@@ -403,7 +408,7 @@ const App = (() => {
         results.innerHTML = '';
         return;
       }
-      results.innerHTML = `<li class="search-result-heading">${escapeHtml(I18N.t('search.recentSearches'))}</li>`;
+      results.innerHTML = `<li class="search-result-heading" role="presentation">${escapeHtml(I18N.t('search.recentSearches'))}</li>`;
       renderSearchResults(results, recents, (station) => {
         selectStation(station);
         input.value = '';
@@ -426,15 +431,22 @@ const App = (() => {
         return;
       }
 
+      const requestId = ++searchRequestId;
       searchDebounce = setTimeout(async () => {
         try {
           const stations = await API.searchAll(query);
+          // Wettlauf-Schutz: falls währenddessen weitergetippt und eine neuere
+          // Suche gestartet wurde, deren (schnellere) Antwort schon
+          // angekommen ist, wird diese ältere, jetzt überholte Antwort
+          // verworfen statt die neueren Ergebnisse zu überschreiben.
+          if (requestId !== searchRequestId) return;
           renderSearchResults(results, stations, (station) => {
             selectStation(station);
             input.value = '';
             results.hidden = true;
           });
         } catch (err) {
+          if (requestId !== searchRequestId) return;
           console.error('Suchfehler:', err.message);
         }
       }, 250);
@@ -450,6 +462,78 @@ const App = (() => {
     });
   }
 
+  // Macht ein Such-Ergebnis-Dropdown per Tastatur bedienbar (Pfeiltasten
+  // rauf/runter, Enter zum Auswählen, Escape zum Schließen) - vorher war das
+  // nur per Maus/Touch nutzbar, was Tastatur- und Screenreader-Nutzer
+  // komplett von der Haltestellensuche ausgeschlossen hat. Nutzt das
+  // "aria-activedescendant"-Muster: der echte Tastaturfokus bleibt im
+  // Eingabefeld, nur die optische/semantische Markierung wandert durch die
+  // Liste - Screenreader kündigen die jeweils markierte Option trotzdem an.
+  function wireSearchKeyboardNav(input, container) {
+    let activeIndex = -1;
+
+    function getOptions() {
+      return Array.from(container.querySelectorAll('[role="option"]'));
+    }
+
+    function setActive(index) {
+      const options = getOptions();
+      options.forEach((el) => {
+        el.classList.remove('search-result--active');
+        el.setAttribute('aria-selected', 'false');
+      });
+      if (index < 0 || index >= options.length) {
+        activeIndex = -1;
+        input.removeAttribute('aria-activedescendant');
+        return;
+      }
+      activeIndex = index;
+      const el = options[index];
+      el.classList.add('search-result--active');
+      el.setAttribute('aria-selected', 'true');
+      if (!el.id) el.id = `search-option-${Math.random().toString(36).slice(2, 9)}`;
+      input.setAttribute('aria-activedescendant', el.id);
+      el.scrollIntoView({ block: 'nearest' });
+    }
+
+    input.addEventListener('keydown', (e) => {
+      if (container.hidden) return;
+      const options = getOptions();
+      if (!options.length) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActive(activeIndex < options.length - 1 ? activeIndex + 1 : 0);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActive(activeIndex > 0 ? activeIndex - 1 : options.length - 1);
+      } else if (e.key === 'Enter') {
+        if (activeIndex >= 0 && options[activeIndex]) {
+          e.preventDefault();
+          options[activeIndex].click();
+        }
+      } else if (e.key === 'Escape') {
+        container.hidden = true;
+        setActive(-1);
+      }
+    });
+
+    // Hält aria-expanded synchron (egal von wo der Dropdown ein-/ausgeblendet
+    // wird) und setzt die Markierung zurück, sobald sich der Inhalt ändert
+    // (neue Suchergebnisse) - so muss nicht an jeder einzelnen Stelle im Code,
+    // die results.hidden setzt, manuell dran gedacht werden.
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((m) => {
+        if (m.type === 'attributes' && m.attributeName === 'hidden') {
+          input.setAttribute('aria-expanded', String(!container.hidden));
+          if (container.hidden) setActive(-1);
+        }
+        if (m.type === 'childList') setActive(-1);
+      });
+    });
+    observer.observe(container, { childList: true, attributes: true, attributeFilter: ['hidden'] });
+  }
+
   // Ein Symbol pro Ergebnis-Herkunft: VBB-Haltestelle (Nahverkehr), echter
   // DB-Bahnhof (bundesweit), oder Adresse/POI (nur im Routenplaner relevant).
   function resultIcon(loc) {
@@ -463,7 +547,7 @@ const App = (() => {
     if (!append) container.innerHTML = '';
 
     if (locations.length === 0) {
-      container.innerHTML = `<li class="search-result search-result--empty">${escapeHtml(I18N.t('search.noResults'))}</li>`;
+      container.innerHTML = `<li class="search-result search-result--empty" role="presentation">${escapeHtml(I18N.t('search.noResults'))}</li>`;
       container.hidden = false;
       return;
     }
@@ -471,8 +555,10 @@ const App = (() => {
     locations.forEach((loc) => {
       const li = document.createElement('li');
       li.className = 'search-result';
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-selected', 'false');
       const badge = loc.source === 'db' ? '<span class="search-result__badge">DB · bundesweit</span>' : '';
-      li.innerHTML = `<span class="search-result__icon">${resultIcon(loc)}</span> ${loc.name}${badge}`;
+      li.innerHTML = `<span class="search-result__icon" aria-hidden="true">${resultIcon(loc)}</span> ${escapeHtml(loc.name)}${badge}`;
       li.addEventListener('click', () => onSelect(loc));
       container.appendChild(li);
     });
@@ -486,10 +572,25 @@ const App = (() => {
     saveRecentSearch(station);
     activateTab('departures');
     document.getElementById('board-station-name').textContent = station.name;
+    document.title = `${station.name} · ÖPNV Navi`;
     document.getElementById('board-empty-state').hidden = true;
     document.getElementById('welcome-panel').hidden = true;
     document.getElementById('departures-view').hidden = false;
     updateFavoriteButton();
+
+    // "In der Nähe"-Vorschau der Startseite ausblenden, sobald eine konkrete
+    // Haltestelle gewählt wurde - sonst bleibt sie über der Abfahrtstafel
+    // stehen, obwohl man längst weitergeklickt hat.
+    const nearbyHomeEl = document.getElementById('nearby-home');
+    if (nearbyHomeEl) nearbyHomeEl.hidden = true;
+
+    // Abfahrtstafel sofort leeren statt die Zeilen der vorherigen Haltestelle
+    // stehen zu lassen, bis die neuen Daten da sind - bei langsamer Verbindung
+    // sah man sonst kurz "S41 → Ringbahn" unter dem bereits neuen
+    // Stationsnamen, was verwirrend war.
+    const board = document.getElementById('departure-board');
+    if (board) board.innerHTML = `<div class="board-empty board-loading"><span class="spinner" aria-hidden="true"></span> ${escapeHtml(I18N.t('departures.loading'))}</div>`;
+    lastRenderedSource = null;
 
     // Störungsanzeige der zuvor gewählten Haltestelle sofort verstecken,
     // damit nicht kurz die alten Störungen der letzten Station aufblitzen,
@@ -521,7 +622,14 @@ const App = (() => {
       renderDepartureBoard(data.departures);
       renderStationDisruptions(data.disruptions);
     } catch (err) {
-      board.innerHTML = `<div class="board-error">⚠ ${err.message}</div>`;
+      board.innerHTML = `
+        <div class="board-error">
+          ⚠ ${escapeHtml(err.message)}
+          <button id="board-retry" class="text-button" type="button">${escapeHtml(I18N.t('common.retry'))}</button>
+        </div>
+      `;
+      const retryBtn = document.getElementById('board-retry');
+      if (retryBtn) retryBtn.addEventListener('click', () => loadDepartures());
     }
   }
 
@@ -636,6 +744,11 @@ const App = (() => {
           openModal();
         }
       });
+    } else {
+      // Nicht klickbare Zeile (DB-Haltestelle) - trotzdem ein sinnvolles
+      // Listenelement innerhalb von #departure-board (role="list"), statt
+      // eines rollen-losen div, das für Screenreader wie "nichts" aussieht.
+      row.setAttribute('role', 'listitem');
     }
 
     return row;
@@ -660,6 +773,9 @@ const App = (() => {
     const lineCell = row.querySelector('[data-field="line"]');
     lineCell.style.setProperty('--line-color', dep.color || '#8E99A6');
     lineCell.style.setProperty('--line-text-color', dep.textColor || '#fff');
+    // Auch auf der Zeile selbst setzen, für den farbigen Rand links (schnelles
+    // Scannen der Tafel nach Linie, ohne jede Zeile einzeln lesen zu müssen).
+    row.style.setProperty('--line-color', dep.color || '#8E99A6');
 
     SplitFlap.render(lineCell, (dep.line || '?').toUpperCase());
     SplitFlap.render(row.querySelector('[data-field="direction"]'), (dep.direction || '').toUpperCase());
@@ -719,17 +835,57 @@ const App = (() => {
 
   function initTabs() {
     document.querySelectorAll('[data-tab]').forEach((tab) => {
-      tab.addEventListener('click', () => activateTab(tab.dataset.tab));
+      tab.addEventListener('click', () => activateTab(tab.dataset.tab, { focusPanel: true }));
+    });
+
+    // Pfeiltasten-Navigation innerhalb einer Tab-Leiste (Standard-ARIA-Tabs-
+    // Verhalten: Pfeil links/rechts wechselt zwischen den Tabs, Pos1/Ende
+    // springt an Anfang/Ende) - wichtig für Tastatur-/Screenreader-Nutzer,
+    // die sonst durch jeden Tab-Button einzeln tabben müssten.
+    [
+      Array.from(document.querySelectorAll('.tab-nav [role="tab"]')),
+      Array.from(document.querySelectorAll('.mobile-nav [role="tab"]')),
+    ].forEach((tabs) => {
+      tabs.forEach((tab, index) => {
+        tab.addEventListener('keydown', (e) => {
+          let targetIndex = null;
+          if (e.key === 'ArrowRight') targetIndex = (index + 1) % tabs.length;
+          else if (e.key === 'ArrowLeft') targetIndex = (index - 1 + tabs.length) % tabs.length;
+          else if (e.key === 'Home') targetIndex = 0;
+          else if (e.key === 'End') targetIndex = tabs.length - 1;
+          if (targetIndex === null) return;
+          e.preventDefault();
+          tabs[targetIndex].focus();
+          activateTab(tabs[targetIndex].dataset.tab);
+        });
+      });
     });
   }
 
-  function activateTab(tabName) {
+  function activateTab(tabName, { focusPanel = false } = {}) {
     document.querySelectorAll('.tab-button, .mobile-nav__item').forEach((btn) => {
-      btn.classList.toggle('is-active', btn.dataset.tab === tabName);
+      const active = btn.dataset.tab === tabName;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-selected', String(active));
+      btn.tabIndex = active ? 0 : -1;
     });
+
+    let activePanel = null;
     document.querySelectorAll('.tab-panel').forEach((panel) => {
-      panel.hidden = panel.dataset.tabPanel !== tabName;
+      const active = panel.dataset.tabPanel === tabName;
+      panel.hidden = !active;
+      if (active) activePanel = panel;
     });
+
+    // Bewegt den Fokus zum neu sichtbaren Panel, wenn der Tabwechsel eine
+    // bewusste Navigationshandlung war (Klick/Tastatur auf einen Tab-Button) -
+    // Screenreader-Nutzer landen so direkt im neuen Inhalt, statt weiter auf
+    // dem (jetzt unsichtbaren) Tab-Button zu stehen. Beim initialen Laden der
+    // Seite (restoreLastStop() etc.) wird das bewusst NICHT gemacht, damit der
+    // Fokus nicht ungefragt vom Seitenanfang wegspringt.
+    if (focusPanel && activePanel && activePanel.hasAttribute('tabindex')) {
+      activePanel.focus({ preventScroll: true });
+    }
 
     if (tabName === 'map') {
       LiveMap.startPolling();
@@ -973,7 +1129,11 @@ const App = (() => {
   // Setzt "Jetzt/Abfahrt um/Ankunft um" programmatisch (Klick-Handler UND
   // Wiederherstellung eines geteilten Links nutzen dieselbe Logik).
   function setWhenChoice(mode, whenValue) {
-    document.querySelectorAll('.when-choice').forEach((item) => item.classList.toggle('is-active', item.dataset.when === mode));
+    document.querySelectorAll('.when-choice').forEach((item) => {
+      const active = item.dataset.when === mode;
+      item.classList.toggle('is-active', active);
+      item.setAttribute('aria-pressed', String(active));
+    });
     journeyArrivalMode = mode === 'arrival';
     const when = document.getElementById('journey-when');
     when.hidden = mode === 'now';
@@ -997,7 +1157,7 @@ const App = (() => {
       return;
     }
 
-    resultsEl.innerHTML = `<div class="board-empty">${escapeHtml(I18N.t('journey.searching'))}</div>`;
+    resultsEl.innerHTML = `<div class="board-empty board-loading"><span class="spinner" aria-hidden="true"></span> ${escapeHtml(I18N.t('journey.searching'))}</div>`;
     if (shareRow) shareRow.hidden = true;
 
     const whenInput = document.getElementById('journey-when').value;
@@ -1019,7 +1179,14 @@ const App = (() => {
       renderJourneys(journeys, resultsEl);
       if (shareRow) shareRow.hidden = false;
     } catch (err) {
-      resultsEl.innerHTML = `<div class="board-error">⚠ ${err.message}</div>`;
+      resultsEl.innerHTML = `
+        <div class="board-error">
+          ⚠ ${escapeHtml(err.message)}
+          <button id="journey-retry" class="text-button" type="button">${escapeHtml(I18N.t('common.retry'))}</button>
+        </div>
+      `;
+      const retryBtn = document.getElementById('journey-retry');
+      if (retryBtn) retryBtn.addEventListener('click', () => runJourneySearch());
     }
   }
 
@@ -1081,7 +1248,7 @@ const App = (() => {
 
     try {
       await navigator.clipboard.writeText(url);
-      showToast('Link kopiert!', 'info');
+      showToast('Link kopiert!', 'success');
     } catch (err) {
       console.error('Clipboard-Fehler:', err.message);
       window.prompt('Link kopieren:', url);
@@ -1123,6 +1290,8 @@ const App = (() => {
     const input = document.getElementById(inputId);
     const results = document.getElementById(`${inputId}-results`);
     let debounce = null;
+    let requestId = 0;
+    wireSearchKeyboardNav(input, results);
 
     input.addEventListener('input', () => {
       clearTimeout(debounce);
@@ -1131,9 +1300,11 @@ const App = (() => {
         results.hidden = true;
         return;
       }
+      const thisRequestId = ++requestId;
       debounce = setTimeout(async () => {
         try {
           const { locations } = await API.searchLocations(query);
+          if (thisRequestId !== requestId) return; // veraltete Antwort, verwerfen
           renderSearchResults(results, locations, (loc) => {
             onSelect({ id: loc.id || undefined, lat: loc.latitude, lon: loc.longitude, name: loc.name, kind: loc.kind });
             input.value = loc.name;

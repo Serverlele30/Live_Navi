@@ -28,6 +28,7 @@ const I18N = (() => {
       'common.live': 'LIVE',
       'common.current': 'AKTUELL',
       'common.clear': 'Leeren',
+      'common.retry': 'Erneut versuchen',
       'common.footer': 'ℹ Live-Daten von VBB · Angaben ohne Gewähr',
       'welcome.title': 'Was fährt jetzt?',
       'welcome.text': 'Suche eine Haltestelle oder nutze deinen Standort, um die nächsten Abfahrten zu sehen.',
@@ -45,6 +46,7 @@ const I18N = (() => {
       'departures.noStation': 'Keine Haltestelle ausgewählt',
       'departures.refreshInfo': 'Aktualisierung alle 30 Sekunden',
       'departures.emptyState': 'Suche oben eine Haltestelle, um Live-Abfahrten zu sehen.',
+      'departures.loading': 'Lade Abfahrten…',
       'departures.line': 'Linie',
       'departures.direction': 'Ziel',
       'departures.platform': 'Gleis',
@@ -59,8 +61,13 @@ const I18N = (() => {
       'favorites.title': 'Meine Haltestellen',
       'favorites.text': 'Deine gespeicherten Haltestellen mit Live-Abfahrten und Störungshinweisen.',
       'favorites.enableNotify': 'Störungsbenachrichtigungen aktivieren',
+      'favorites.enableNotifyTitle': 'Störungen sofort mitbekommen',
+      'favorites.enableNotifyText': 'Auch wenn die App gerade nicht offen ist.',
+      'favorites.enableNotifyShort': 'Aktivieren',
       'favorites.notifyActive': 'Benachrichtigungen aktiv',
+      'favorites.notifyActiveShort': '✓ Aktiv',
       'favorites.notifyBlocked': 'Benachrichtigungen blockiert',
+      'favorites.notifyBlockedShort': 'Blockiert',
       'favorites.emptyHint': 'Noch keine Favoriten - tippe bei einer Haltestelle auf ☆, um sie hier anzupinnen.',
       'favorites.loadingNext': 'Lade nächste Abfahrt…',
       'favorites.noDeparture': 'Keine Abfahrt gefunden',
@@ -117,8 +124,11 @@ const I18N = (() => {
       'more.langTitle': 'Sprache',
       'search.noResults': 'Keine Treffer',
       'search.recentSearches': 'Zuletzt gesucht',
+      'search.resultsLabel': 'Suchergebnisse',
       'recent.empty': 'Noch keine Suchen.',
       'recent.remove': '{name} aus Verlauf entfernen',
+      'a11y.skipLink': 'Zum Inhalt springen',
+      'map.a11yDescription': 'Live-Karte mit Fahrzeugpositionen. Für Screenreader-Nutzer eingeschränkt zugänglich - Details zu einzelnen Fahrten sind über die Abfahrtstafel und den Routenplaner verfügbar.',
     },
     en: {
       'search.placeholder': 'Search for a stop, place or destination…',
@@ -133,6 +143,7 @@ const I18N = (() => {
       'common.live': 'LIVE',
       'common.current': 'CURRENT',
       'common.clear': 'Clear',
+      'common.retry': 'Try again',
       'common.footer': 'ℹ Live data from VBB · No guarantee of accuracy',
       'welcome.title': 'What\u2019s leaving now?',
       'welcome.text': 'Search for a stop or use your location to see the next departures.',
@@ -150,6 +161,7 @@ const I18N = (() => {
       'departures.noStation': 'No stop selected',
       'departures.refreshInfo': 'Updates every 30 seconds',
       'departures.emptyState': 'Search for a stop above to see live departures.',
+      'departures.loading': 'Loading departures…',
       'departures.line': 'Line',
       'departures.direction': 'Towards',
       'departures.platform': 'Platform',
@@ -164,8 +176,13 @@ const I18N = (() => {
       'favorites.title': 'My Stops',
       'favorites.text': 'Your saved stops with live departures and disruption notices.',
       'favorites.enableNotify': 'Enable disruption notifications',
+      'favorites.enableNotifyTitle': 'Hear about disruptions right away',
+      'favorites.enableNotifyText': 'Even when the app isn\u2019t open.',
+      'favorites.enableNotifyShort': 'Enable',
       'favorites.notifyActive': 'Notifications active',
+      'favorites.notifyActiveShort': '✓ Active',
       'favorites.notifyBlocked': 'Notifications blocked',
+      'favorites.notifyBlockedShort': 'Blocked',
       'favorites.emptyHint': 'No favorites yet - tap ☆ at a stop to pin it here.',
       'favorites.loadingNext': 'Loading next departure…',
       'favorites.noDeparture': 'No departure found',
@@ -222,8 +239,11 @@ const I18N = (() => {
       'more.langTitle': 'Language',
       'search.noResults': 'No results',
       'search.recentSearches': 'Recently searched',
+      'search.resultsLabel': 'Search results',
       'recent.empty': 'No searches yet.',
       'recent.remove': 'Remove {name} from history',
+      'a11y.skipLink': 'Skip to content',
+      'map.a11yDescription': 'Live map with vehicle positions. Limited accessibility for screen reader users - trip details are available via the departure board and journey planner.',
     },
   };
 
@@ -263,7 +283,9 @@ const I18N = (() => {
       el.title = t(el.dataset.i18nTitle);
     });
     document.querySelectorAll('.lang-switch__btn').forEach((btn) => {
-      btn.classList.toggle('is-active', btn.dataset.lang === lang);
+      const active = btn.dataset.lang === lang;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-pressed', String(active));
     });
   }
 

@@ -198,8 +198,10 @@ const TripAlarm = (() => {
     banner = document.createElement('div');
     banner.id = 'trip-alarm-banner';
     banner.className = 'trip-alarm-banner';
+    banner.setAttribute('role', 'status');
+    banner.setAttribute('aria-live', 'polite');
     banner.innerHTML = `
-      <span class="trip-alarm-banner__icon">🔔</span>
+      <span class="trip-alarm-banner__icon" aria-hidden="true">🔔</span>
       <span id="trip-alarm-banner__text" class="trip-alarm-banner__text"></span>
       <button id="trip-alarm-banner__cancel" type="button">Alarm beenden</button>
     `;
@@ -262,16 +264,35 @@ const TripAlarm = (() => {
     overlay.id = 'trip-alarm-overlay';
     overlay.className = 'trip-alarm-overlay';
     overlay.hidden = true;
+    overlay.setAttribute('role', 'alertdialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'trip-alarm-overlay__heading');
+    overlay.setAttribute('aria-describedby', 'trip-alarm-overlay__text');
     overlay.innerHTML = `
       <div class="trip-alarm-overlay__card">
-        <div class="trip-alarm-overlay__icon">⏰</div>
-        <h2>Aufwachen!</h2>
+        <div class="trip-alarm-overlay__icon" aria-hidden="true">⏰</div>
+        <h2 id="trip-alarm-overlay__heading">Aufwachen!</h2>
         <p id="trip-alarm-overlay__text"></p>
         <button id="trip-alarm-overlay__dismiss" type="button">Alarm beenden</button>
       </div>
     `;
     document.body.appendChild(overlay);
     overlay.querySelector('#trip-alarm-overlay__dismiss').addEventListener('click', clear);
+
+    // Nur ein interaktives Element im Overlay - "Falle" ist hier trivial:
+    // Tab/Shift+Tab bleibt einfach immer auf dem einen Button, Escape löst
+    // dieselbe Aktion wie der Button aus.
+    overlay.addEventListener('keydown', (e) => {
+      if (overlay.hidden) return;
+      const dismissBtn = document.getElementById('trip-alarm-overlay__dismiss');
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        dismissBtn.focus();
+      } else if (e.key === 'Escape') {
+        clear();
+      }
+    });
+
     return overlay;
   }
 
@@ -282,6 +303,9 @@ const TripAlarm = (() => {
       ? `Gleich da: ${stopName}`
       : `Noch ${stopsRemaining} Station${stopsRemaining === 1 ? '' : 'en'} bis ${stopName}`;
     overlay.hidden = false;
+    // Fokus sofort auf den einzigen Button - der Alarm unterbricht bewusst
+    // alles andere, das muss auch für Screenreader-Nutzer sofort ankommen.
+    document.getElementById('trip-alarm-overlay__dismiss').focus();
   }
 
   function hideOverlay() {

@@ -6,9 +6,11 @@
 
 const TripModal = (() => {
   const ALARM_OFFSET_KEY = 'oepnv-navi:db-alarm-offset';
+  const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
   let backdrop = null;
   let miniMap = null;
+  let lastFocusedElement = null;
 
   // Zustand der aktuell geöffneten Fahrt, damit wir nach dem Setzen/Entfernen
   // eines Alarms den Haltestellen-Teil neu rendern können, ohne die Fahrt
@@ -46,7 +48,27 @@ const TripModal = (() => {
       if (e.target === backdrop) close();
     });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !backdrop.hidden) close();
+      if (backdrop.hidden) return;
+      if (e.key === 'Escape') {
+        close();
+        return;
+      }
+      // Fokus-Falle: Tab darf das Dialog nicht verlassen, solange es offen
+      // ist - sonst würde ein Tastatur-/Screenreader-Nutzer "hinter" den
+      // Dialog auf die (für ihn unsichtbar gewordene) Seite dahinter tabben.
+      if (e.key === 'Tab') {
+        const focusable = Array.from(backdrop.querySelectorAll(FOCUSABLE_SELECTOR)).filter((el) => el.offsetParent !== null);
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     });
 
     // Delegierter Klick-Handler für die Alarm-Glocken an den Haltestellen -
@@ -69,11 +91,22 @@ const TripModal = (() => {
       miniMap.remove();
       miniMap = null;
     }
+    // Fokus zurück zur auslösenden Abfahrtszeile/dem Link geben, statt ihn
+    // einfach verloren gehen zu lassen (würde sonst auf <body> zurückfallen -
+    // Tastatur-/Screenreader-Nutzer wüssten dann nicht mehr, wo sie sind).
+    if (lastFocusedElement && document.body.contains(lastFocusedElement)) {
+      lastFocusedElement.focus();
+    }
+    lastFocusedElement = null;
   }
 
   function formatTime(iso) {
     if (!iso) return null;
     return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
   }
 
   // Verspätungsstatistik pro Linie - Datenbasis wächst erst über Zeit, auf
@@ -152,8 +185,9 @@ const TripModal = (() => {
     // Halte Sinn - nicht für bereits vergangene.
     const canAlarm = !s.cancelled && index >= currentIndex;
     const isActiveAlarm = canAlarm && TripAlarm.isActiveFor(currentTripId, index);
+    const alarmLabel = isActiveAlarm ? 'Fahrtalarm entfernen' : `Fahrtalarm für ${s.name || 'diese Haltestelle'} setzen`;
     const alarmHtml = canAlarm
-      ? `<button class="trip-stopover__alarm-btn ${isActiveAlarm ? 'is-active' : ''}" data-alarm-index="${index}" type="button" title="${isActiveAlarm ? 'Fahrtalarm entfernen' : 'Fahrtalarm für diese Haltestelle setzen'}">${isActiveAlarm ? '🔔' : '🔕'}</button>`
+      ? `<button class="trip-stopover__alarm-btn ${isActiveAlarm ? 'is-active' : ''}" data-alarm-index="${index}" type="button" aria-label="${escapeHtml(alarmLabel)}" aria-pressed="${isActiveAlarm}" title="${escapeHtml(alarmLabel)}"><span aria-hidden="true">${isActiveAlarm ? '🔔' : '🔕'}</span></button>`
       : '';
 
     return `
@@ -206,6 +240,7 @@ const TripModal = (() => {
 
   async function open(tripId) {
     if (!tripId) return;
+    lastFocusedElement = document.activeElement;
     const el = ensureBackdrop();
     el.hidden = false;
     currentTripId = tripId;
@@ -215,9 +250,16 @@ const TripModal = (() => {
     if (statsEl) { statsEl.hidden = true; }
 
     document.getElementById('trip-modal-line').textContent = '…';
-    document.getElementById('trip-modal-line').style.background = '#8E99A6';    document.getElementById('trip-modal-direction').textContent = '';
+    document.getElementById('trip-modal-line').style.background = '#8E99A6';
+    document.getElementById('trip-modal-direction').textContent = '';
     document.getElementById('trip-modal-meta').textContent = '';
     document.getElementById('trip-modal-body').innerHTML = '<div class="trip-modal__loading"><span class="spinner"></span>Lade Fahrt-Details…</div>';
+
+    // Fokus sofort in den Dialog holen (auf den Schließen-Button), damit
+    // Screenreader-Nutzer merken, dass sich ein Dialog geöffnet hat, statt
+    // weiter "unsichtbar" auf der jetzt verdeckten Seite zu stehen.
+    const closeBtn = el.querySelector('.trip-modal__close');
+    if (closeBtn) closeBtn.focus();
 
     let trip;
     try {
