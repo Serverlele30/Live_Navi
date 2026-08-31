@@ -198,7 +198,35 @@ const TripAlarm = (() => {
     `;
     document.body.appendChild(banner);
     banner.querySelector('#trip-alarm-banner__cancel').addEventListener('click', clear);
+
+    // Position hängt vom tatsächlich gerenderten Header ab (unterscheidet
+    // sich zwischen Mobile/Desktop und wird nicht über CSS-Breakpoint-Werte
+    // geraten, sondern - wie schon bei der Live-Karte - direkt gemessen),
+    // damit das Banner den Header/die Suche nie verdeckt, egal auf welcher
+    // Displaygröße oder welchem Tab (z.B. auch über der jetzt display-breiten
+    // Live-Karte) es gerade erscheint.
+    window.addEventListener('resize', schedulePositionBanner);
+    window.addEventListener('orientationchange', schedulePositionBanner);
+
     return banner;
+  }
+
+  let positionScheduled = false;
+  function schedulePositionBanner() {
+    if (positionScheduled) return;
+    positionScheduled = true;
+    requestAnimationFrame(() => {
+      positionScheduled = false;
+      positionBanner();
+    });
+  }
+
+  function positionBanner() {
+    const banner = document.getElementById('trip-alarm-banner');
+    if (!banner) return;
+    const header = document.querySelector('.app-header');
+    const headerBottom = header ? header.getBoundingClientRect().bottom : 0;
+    banner.style.top = `${Math.max(12, Math.round(headerBottom + 8))}px`;
   }
 
   function renderBanner(stopsRemaining) {
@@ -209,6 +237,7 @@ const TripAlarm = (() => {
     textEl.textContent = stopsRemaining == null
       ? `Fahrtalarm gesetzt für ${alarm.targetName}`
       : `${line}Fahrtalarm: noch ${stopsRemaining} Station${stopsRemaining === 1 ? '' : 'en'} bis ${alarm.targetName}`;
+    positionBanner();
     banner.classList.add('is-visible');
   }
 

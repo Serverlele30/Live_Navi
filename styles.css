@@ -34,6 +34,10 @@ html, body {
   color: var(--ink);
   font-family: var(--font-body);
   min-height: 100vh;
+  /* Verhindert eine horizontale Scrollbar durch den Full-Bleed-Trick der
+     Live-Karte (100vw kann inkl. Scrollbar-Breite minimal über die
+     tatsächliche Fensterbreite hinausschießen). */
+  overflow-x: hidden;
 }
 
 button {
@@ -433,14 +437,27 @@ button {
    livemap.js die Höhe zur Laufzeit anhand des tatsächlich verfügbaren
    Platzes exakt nachjustiert (siehe resizeToViewport() in livemap.js).
    dvh (dynamische Viewport-Höhe) berücksichtigt ein-/ausblendende mobile
-   Adressleisten korrekt; vh davor dient als Fallback für ältere Browser. */
+   Adressleisten korrekt; vh davor dient als Fallback für ältere Browser.
+
+   Die Karte selbst durchbricht bewusst die Innenabstände/Maximalbreite von
+   .app-main ("Full-Bleed"-Technik: left:50% + negativer Margin von -50vw
+   zieht sie auf volle Viewport-Breite) - Bedienelemente (map-controls,
+   Isolations-Banner) bleiben normal eingerückt, nur die Kartenfläche selbst
+   nutzt den kompletten Displayplatz. Funktioniert identisch auf jeder
+   Bildschirmgröße, ohne pro Breakpoint unterschiedliche Werte nachpflegen zu
+   müssen. */
 .live-map {
   height: min(70vh, 560px);
   height: min(70dvh, 560px);
   min-height: 320px;
-  border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--line);
+  border-left: 0;
+  border-right: 0;
+  position: relative;
+  left: 50%;
+  width: 100vw;
+  margin-left: -50vw;
 }
 
 .vehicle-marker span {
@@ -1323,10 +1340,10 @@ button:active { transform: translateY(1px); }
   align-items: center;
   gap: 10px;
   position: fixed;
-  top: 12px;
+  top: 12px; /* Fallback, bevor JS die reale Header-Höhe gemessen hat */
   left: 50%;
   transform: translateX(-50%);
-  z-index: 190;
+  z-index: 1200; /* über Leaflets eigenen Steuerelementen (z.B. Zoom-Buttons ~1000) */
   background: var(--panel-raised);
   border: 1px solid var(--signal-amber);
   border-radius: var(--radius);
@@ -1354,7 +1371,7 @@ button:active { transform: translateY(1px); }
 .trip-alarm-overlay {
   position: fixed;
   inset: 0;
-  z-index: 300;
+  z-index: 1300;
   display: flex;
   align-items: center;
   justify-content: center;
