@@ -59,7 +59,7 @@ const App = (() => {
     const items = loadRecentSearches();
     container.innerHTML = '';
     if (!items.length) {
-      container.innerHTML = '<div class="recent-empty">Noch keine Suchen.</div>';
+      container.innerHTML = `<div class="recent-empty">${escapeHtml(I18N.t('recent.empty'))}</div>`;
       return;
     }
     items.forEach((item) => {
@@ -75,7 +75,7 @@ const App = (() => {
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.className = 'recent-item__remove';
-      remove.setAttribute('aria-label', `${item.name} aus Verlauf entfernen`);
+      remove.setAttribute('aria-label', I18N.t('recent.remove', { name: item.name }));
       remove.textContent = '×';
       remove.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -150,7 +150,7 @@ const App = (() => {
           <span class="favorite-card__star">★</span>
           <span>
             <strong>${escapeHtml(fav.name)}</strong>
-            <small class="favorite-card__next" data-next-departure>Lade nächste Abfahrt…</small>
+            <small class="favorite-card__next" data-next-departure>${escapeHtml(I18N.t('favorites.loadingNext'))}</small>
             <small class="favorite-card__disruption" data-disruption hidden></small>
           </span>
           <span class="favorite-card__arrow">→</span>
@@ -252,14 +252,14 @@ const App = (() => {
 
         if (el) {
           if (r.error || !r.nextDeparture) {
-            el.textContent = 'Keine Abfahrt gefunden';
+            el.textContent = I18N.t('favorites.noDeparture');
           } else {
             const dep = r.nextDeparture;
             const minutesUntil = dep.when ? Math.max(0, Math.round((new Date(dep.when) - new Date()) / 60000)) : null;
             if (dep.cancelled) {
-              el.innerHTML = `<span class="favorite-card__cancelled">${escapeHtml(dep.line || '')} fällt aus</span>`;
+              el.innerHTML = `<span class="favorite-card__cancelled">${escapeHtml(dep.line || '')} ${escapeHtml(I18N.t('favorites.cancelledShort'))}</span>`;
             } else {
-              el.textContent = `${dep.line || '?'} → ${dep.direction || ''} · ${minutesUntil != null ? minutesUntil + ' min' : ''}`;
+              el.textContent = `${dep.line || '?'} → ${dep.direction || ''} · ${minutesUntil != null ? minutesUntil + ' ' + I18N.t('favorites.minutesShort') : ''}`;
             }
           }
         }
@@ -320,15 +320,15 @@ const App = (() => {
     }
     btn.hidden = false;
     if (Notification.permission === 'granted') {
-      btn.textContent = '🔔 Benachrichtigungen aktiv';
+      btn.textContent = `🔔 ${I18N.t('favorites.notifyActive')}`;
       btn.classList.add('is-active');
       btn.disabled = true;
     } else if (Notification.permission === 'denied') {
-      btn.textContent = '🔕 Benachrichtigungen blockiert';
+      btn.textContent = `🔕 ${I18N.t('favorites.notifyBlocked')}`;
       btn.classList.remove('is-active');
       btn.disabled = true;
     } else {
-      btn.textContent = '🔔 Störungsbenachrichtigungen aktivieren';
+      btn.textContent = `🔔 ${I18N.t('favorites.enableNotify')}`;
       btn.classList.remove('is-active');
       btn.disabled = false;
     }
@@ -356,7 +356,7 @@ const App = (() => {
     }
     btn.hidden = false;
     const active = isFavorite(currentStop.id);
-    btn.textContent = active ? '★ Favorit' : '☆ Favorit';
+    btn.textContent = `${active ? '★' : '☆'} ${I18N.t('favorites.favorite')}`;
     btn.classList.toggle('is-active', active);
   }
 
@@ -389,7 +389,7 @@ const App = (() => {
         results.innerHTML = '';
         return;
       }
-      results.innerHTML = '<li class="search-result-heading">Zuletzt gesucht</li>';
+      results.innerHTML = `<li class="search-result-heading">${escapeHtml(I18N.t('search.recentSearches'))}</li>`;
       renderSearchResults(results, recents, (station) => {
         selectStation(station);
         input.value = '';
@@ -449,7 +449,7 @@ const App = (() => {
     if (!append) container.innerHTML = '';
 
     if (locations.length === 0) {
-      container.innerHTML = '<li class="search-result search-result--empty">Keine Treffer</li>';
+      container.innerHTML = `<li class="search-result search-result--empty">${escapeHtml(I18N.t('search.noResults'))}</li>`;
       container.hidden = false;
       return;
     }
@@ -561,7 +561,7 @@ const App = (() => {
     const source = currentStop ? currentStop.source : null;
 
     if (departures.length === 0) {
-      board.innerHTML = '<div class="board-empty">Keine Abfahrten für die gewählten Verkehrsmittel in den nächsten 30 Minuten.</div>';
+      board.innerHTML = `<div class="board-empty">${escapeHtml(I18N.t('departures.noResultsForModes'))}</div>`;
       lastRenderedSource = source;
       return;
     }
@@ -589,19 +589,19 @@ const App = (() => {
     row.style.setProperty('--row-index', index);
     row.innerHTML = `
       <div class="flap-field flap-field--line">
-        <span class="flap-label">Linie</span>
+        <span class="flap-label">${escapeHtml(I18N.t('departures.line'))}</span>
         <span class="flap-cell flap-cell--line" data-field="line"></span>
       </div>
       <div class="flap-field flap-field--direction">
-        <span class="flap-label">Ziel</span>
+        <span class="flap-label">${escapeHtml(I18N.t('departures.direction'))}</span>
         <span class="flap-cell flap-cell--direction" data-field="direction"></span>
       </div>
       <div class="flap-field flap-field--platform">
-        <span class="flap-label">Gleis</span>
+        <span class="flap-label">${escapeHtml(I18N.t('departures.platform'))}</span>
         <span class="flap-cell flap-cell--platform" data-field="platform"></span>
       </div>
       <div class="flap-field flap-field--time">
-        <span class="flap-label">Abfahrt</span>
+        <span class="flap-label">${escapeHtml(I18N.t('departures.time'))}</span>
         <span class="flap-cell flap-cell--time" data-field="time"></span>
       </div>
     `;
@@ -664,8 +664,8 @@ const App = (() => {
         platformCell.dataset.changedFrom = plannedPlatform;
         platformCell.classList.add('flap-cell--platform-changed');
         platformCell.innerHTML = `
-          <span class="platform-changed-flag">GLEIS ${escapeHtml(newPlatform)}</span>
-          <span class="platform-changed-original">statt ${escapeHtml(plannedPlatform)}</span>
+          <span class="platform-changed-flag">${escapeHtml(I18N.t('departures.platformChanged', { n: newPlatform }))}</span>
+          <span class="platform-changed-original">${escapeHtml(I18N.t('departures.platformInstead', { n: plannedPlatform }))}</span>
         `;
       }
     } else {
@@ -687,8 +687,8 @@ const App = (() => {
         timeCell.dataset.cancelledPlanned = plannedTime;
         timeCell.classList.add('flap-cell--time-cancelled');
         timeCell.innerHTML = `
-          <span class="cancelled-flag">FÄLLT AUS</span>
-          <span class="cancelled-original">urspr. ${plannedTime}</span>
+          <span class="cancelled-flag">${escapeHtml(I18N.t('departures.cancelled'))}</span>
+          <span class="cancelled-original">${escapeHtml(I18N.t('departures.plannedShort'))} ${escapeHtml(plannedTime)}</span>
         `;
       }
     } else {
@@ -979,11 +979,11 @@ const App = (() => {
     const shareRow = document.getElementById('journey-share-row');
 
     if (!journeyFrom || !journeyTo) {
-      resultsEl.innerHTML = '<div class="board-error">Bitte Start und Ziel aus der Liste auswählen.</div>';
+      resultsEl.innerHTML = `<div class="board-error">${escapeHtml(I18N.t('journey.selectFromResults'))}</div>`;
       return;
     }
 
-    resultsEl.innerHTML = '<div class="board-empty">Suche Verbindungen…</div>';
+    resultsEl.innerHTML = `<div class="board-empty">${escapeHtml(I18N.t('journey.searching'))}</div>`;
     if (shareRow) shareRow.hidden = true;
 
     const whenInput = document.getElementById('journey-when').value;
@@ -1142,7 +1142,7 @@ const App = (() => {
     container.innerHTML = '';
 
     if (journeys.length === 0) {
-      container.innerHTML = '<div class="board-empty">Keine Verbindungen gefunden.</div>';
+      container.innerHTML = `<div class="board-empty">${escapeHtml(I18N.t('journey.noResults'))}</div>`;
       return;
     }
 
@@ -1261,6 +1261,19 @@ const App = (() => {
   }
 
   function init() {
+    I18N.init();
+    I18N.setOnLangChange(() => {
+      // [data-i18n]-Elemente übernimmt I18N.applyStaticTranslations() bereits
+      // selbst - hier nur die dynamisch (per JS-Template) erzeugten Bereiche
+      // neu aufbauen, die Sprachwechsel sonst nicht mitbekommen würden.
+      lastRenderedSource = null;
+      if (currentStop) loadDepartures();
+      renderFavoriteChips();
+    });
+    document.querySelectorAll('.lang-switch__btn').forEach((btn) => {
+      btn.addEventListener('click', () => I18N.setLang(btn.dataset.lang));
+    });
+
     initSearch();
     initTabs();
     initJourneyPlanner();

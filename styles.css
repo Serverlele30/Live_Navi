@@ -866,7 +866,7 @@ button:active { transform: translateY(1px); }
   border-bottom: 1px solid var(--line);
 }
 .tab-button { padding: 14px 18px; display: inline-flex; gap: 8px; align-items: center; }
-.tab-button span { filter: grayscale(.35); }
+.tab-button__icon { filter: grayscale(.35); }
 
 .app-main { max-width: 920px; padding: 30px 20px 50px; }
 
@@ -1072,6 +1072,14 @@ button:active { transform: translateY(1px); }
 .recent-item__remove:hover { background: var(--panel-raised); color: var(--signal-red); }
 .recent-empty { color: var(--ink-muted); font-size: 12px; padding: 8px 0; }
 
+.lang-switch { display: flex; gap: 8px; }
+.lang-switch__btn {
+  background: var(--panel); color: var(--ink-muted); border: 1px solid var(--line);
+  border-radius: 999px; padding: 8px 16px; font-size: 13px;
+}
+.lang-switch__btn:hover { border-color: var(--signal-amber); }
+.lang-switch__btn.is-active { color: var(--signal-amber); border-color: var(--signal-amber); background: rgba(245,166,35,.08); }
+
 .search-result-heading {
   padding: 8px 12px 4px;
   color: var(--ink-muted);
@@ -1172,6 +1180,14 @@ button:active { transform: translateY(1px); }
 
 .trip-modal__close:hover {
   border-color: var(--signal-amber);
+}
+
+.trip-modal__stats {
+  padding: 8px 18px;
+  font-size: 12px;
+  color: var(--ink-muted);
+  background: var(--panel-raised);
+  border-bottom: 1px solid var(--line);
 }
 
 .trip-modal__map {

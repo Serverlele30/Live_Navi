@@ -24,43 +24,43 @@
 
     <div class="search-box search-box--global">
       <span class="search-box__icon" aria-hidden="true">⌕</span>
-      <input type="text" id="station-search" placeholder="Haltestelle, Ort oder Ziel suchen…" autocomplete="off" aria-label="Haltestelle, Ort oder Ziel suchen" />
-      <button id="search-clear" class="search-clear" type="button" aria-label="Suche leeren" hidden>×</button>
+      <input type="text" id="station-search" placeholder="Haltestelle, Ort oder Ziel suchen…" data-i18n-placeholder="search.placeholder" autocomplete="off" aria-label="Haltestelle, Ort oder Ziel suchen" data-i18n-aria-label="search.placeholder" />
+      <button id="search-clear" class="search-clear" type="button" aria-label="Suche leeren" data-i18n-aria-label="search.clear" hidden>×</button>
       <ul id="search-results" class="search-results" hidden></ul>
     </div>
 
-    <button id="header-favorites-btn" class="header-icon-btn" data-tab="favorites" type="button" title="Favoriten" aria-label="Favoriten">★</button>
+    <button id="header-favorites-btn" class="header-icon-btn" data-tab="favorites" type="button" title="Favoriten" data-i18n-title="nav.favorites" aria-label="Favoriten" data-i18n-aria-label="nav.favorites">★</button>
   </header>
 
   <nav class="tab-nav" aria-label="Hauptnavigation">
-    <button class="tab-button is-active" data-tab="departures"><span>🚏</span> Abfahrten</button>
-    <button class="tab-button" data-tab="journey"><span>🧭</span> Route</button>
-    <button class="tab-button" data-tab="map"><span>🗺</span> Karte</button>
-    <button class="tab-button" data-tab="more"><span>☰</span> Mehr</button>
+    <button class="tab-button is-active" data-tab="departures"><span class="tab-button__icon">🚏</span> <span data-i18n="nav.departures">Abfahrten</span></button>
+    <button class="tab-button" data-tab="journey"><span class="tab-button__icon">🧭</span> <span data-i18n="nav.route">Route</span></button>
+    <button class="tab-button" data-tab="map"><span class="tab-button__icon">🗺</span> <span data-i18n="nav.map">Karte</span></button>
+    <button class="tab-button" data-tab="more"><span class="tab-button__icon">☰</span> <span data-i18n="nav.more">Mehr</span></button>
   </nav>
 
   <main class="app-main">
     <section class="tab-panel" data-tab-panel="departures">
       <div class="welcome-panel" id="welcome-panel">
         <div class="welcome-panel__eyebrow">LIVE · VBB</div>
-        <h1>Was fährt jetzt?</h1>
-        <p>Suche eine Haltestelle oder nutze deinen Standort, um die nächsten Abfahrten zu sehen.</p>
+        <h1 data-i18n="welcome.title">Was fährt jetzt?</h1>
+        <p data-i18n="welcome.text">Suche eine Haltestelle oder nutze deinen Standort, um die nächsten Abfahrten zu sehen.</p>
         <div class="welcome-actions">
           <button id="welcome-nearby" class="action-card action-card--primary" type="button">
             <span class="action-card__icon">📍</span>
-            <span><strong>In meiner Nähe</strong><small>Haltestellen im Umkreis finden</small></span>
+            <span><strong data-i18n="welcome.nearbyTitle">In meiner Nähe</strong><small data-i18n="welcome.nearbyText">Haltestellen im Umkreis finden</small></span>
           </button>
           <button id="welcome-route" class="action-card" type="button">
             <span class="action-card__icon">🧭</span>
-            <span><strong>Route planen</strong><small>Von A nach B mit Bus &amp; Bahn</small></span>
+            <span><strong data-i18n="welcome.routeTitle">Route planen</strong><small data-i18n="welcome.routeText">Von A nach B mit Bus &amp; Bahn</small></span>
           </button>
         </div>
       </div>
 
       <div id="nearby-home" class="home-section" hidden>
         <div class="section-heading">
-          <div><span class="section-heading__eyebrow">OPTIONAL</span><h2>Haltestellen in der Nähe</h2></div>
-          <button id="nearby-home-open" class="text-button" type="button">Alle anzeigen</button>
+          <div><span class="section-heading__eyebrow" data-i18n="common.optional">OPTIONAL</span><h2 data-i18n="nearby.homeTitle">Haltestellen in der Nähe</h2></div>
+          <button id="nearby-home-open" class="text-button" type="button" data-i18n="common.showAll">Alle anzeigen</button>
         </div>
         <div id="nearby-home-list" class="nearby-preview"></div>
       </div>
@@ -68,152 +68,160 @@
       <div id="departures-view" hidden>
         <div class="board-header">
           <div>
-            <span class="section-heading__eyebrow">LIVE-ABFAHRTEN</span>
-            <h1 id="board-station-name" class="board-station-name">Keine Haltestelle ausgewählt</h1>
+            <span class="section-heading__eyebrow" data-i18n="departures.eyebrow">LIVE-ABFAHRTEN</span>
+            <h1 id="board-station-name" class="board-station-name" data-i18n="departures.noStation">Keine Haltestelle ausgewählt</h1>
           </div>
-          <button id="favorite-toggle" class="favorite-toggle" hidden>☆ Favorit</button>
+          <button id="favorite-toggle" class="favorite-toggle" hidden>☆ <span data-i18n="favorites.favorite">Favorit</span></button>
         </div>
-        <div id="board-status" class="board-status" aria-live="polite"><span class="status-dot"></span> Aktualisierung alle 30 Sekunden</div>
+        <div id="board-status" class="board-status" aria-live="polite"><span class="status-dot"></span> <span data-i18n="departures.refreshInfo">Aktualisierung alle 30 Sekunden</span></div>
         <div id="departures-mode-filter" class="mode-filter"></div>
         <div id="departure-board" class="departure-board" role="table" aria-label="Abfahrtstafel"></div>
-        <div id="board-empty-state" class="board-empty-state">Suche oben eine Haltestelle, um Live-Abfahrten zu sehen.</div>
+        <div id="board-empty-state" class="board-empty-state" data-i18n="departures.emptyState">Suche oben eine Haltestelle, um Live-Abfahrten zu sehen.</div>
         <div id="elevator-status" class="elevator-status" hidden></div>
         <div id="station-disruption" class="station-disruption" hidden></div>
       </div>
     </section>
 
     <section class="tab-panel" data-tab-panel="map" hidden>
-      <div class="panel-heading"><div><span class="section-heading__eyebrow">LIVE</span><h1>Karte</h1><p>Fahrzeuge, Routen und deine aktuelle Fahrt live verfolgen.</p></div></div>
+      <div class="panel-heading"><div><span class="section-heading__eyebrow" data-i18n="common.live">LIVE</span><h1 data-i18n="map.title">Karte</h1><p data-i18n="map.text">Fahrzeuge, Routen und deine aktuelle Fahrt live verfolgen.</p></div></div>
       <div class="map-controls">
         <div id="map-mode-filter" class="mode-filter"></div>
-        <button id="map-locate" class="map-locate-btn" type="button">📍 Mein Standort</button>
+        <button id="map-locate" class="map-locate-btn" type="button">📍 <span data-i18n="map.locate">Mein Standort</span></button>
       </div>
       <div id="map-isolation-banner" class="map-isolation-banner">
-        <span>Verfolge Linie <span id="map-isolation-line" class="map-isolation-banner__line"></span> live</span>
-        <button id="map-isolation-reset" type="button">Alle Linien anzeigen</button>
+        <span><span data-i18n="map.following">Verfolge Linie</span> <span id="map-isolation-line" class="map-isolation-banner__line"></span> <span data-i18n="map.live">live</span></span>
+        <button id="map-isolation-reset" type="button" data-i18n="map.showAllLines">Alle Linien anzeigen</button>
       </div>
       <div id="live-map" class="live-map"></div>
     </section>
 
     <section class="tab-panel" data-tab-panel="journey" hidden>
-      <div class="panel-heading"><div><span class="section-heading__eyebrow">VERBINDUNG SUCHEN</span><h1>Wohin möchtest du?</h1><p>Starte mit deinem Standort oder suche einen Ausgangspunkt.</p></div></div>
+      <div class="panel-heading"><div><span class="section-heading__eyebrow" data-i18n="journey.eyebrow">VERBINDUNG SUCHEN</span><h1 data-i18n="journey.title">Wohin möchtest du?</h1><p data-i18n="journey.text">Starte mit deinem Standort oder suche einen Ausgangspunkt.</p></div></div>
       <div class="journey-card-form">
         <div class="journey-input-row">
           <div class="journey-input-marker journey-input-marker--start">●</div>
           <div class="search-box">
-            <input type="text" id="journey-from" placeholder="Mein Standort oder Start…" autocomplete="off" />
+            <input type="text" id="journey-from" placeholder="Mein Standort oder Start…" data-i18n-placeholder="journey.fromPlaceholder" autocomplete="off" />
             <ul id="journey-from-results" class="search-results" hidden></ul>
           </div>
-          <button id="journey-use-location" class="location-btn" title="Meinen Standort verwenden" aria-label="Meinen Standort verwenden">📍</button>
+          <button id="journey-use-location" class="location-btn" title="Meinen Standort verwenden" data-i18n-title="journey.useLocation" aria-label="Meinen Standort verwenden" data-i18n-aria-label="journey.useLocation">📍</button>
         </div>
         <div class="journey-connector"></div>
         <div class="journey-input-row">
           <div class="journey-input-marker journey-input-marker--end">●</div>
           <div class="search-box">
-            <input type="text" id="journey-to" placeholder="Wohin?" autocomplete="off" />
+            <input type="text" id="journey-to" placeholder="Wohin?" data-i18n-placeholder="journey.toPlaceholder" autocomplete="off" />
             <ul id="journey-to-results" class="search-results" hidden></ul>
           </div>
         </div>
       </div>
 
       <div class="journey-when">
-        <button class="when-choice is-active" data-when="now" type="button">● Jetzt</button>
-        <button class="when-choice" data-when="departure" type="button">Abfahrt um</button>
-        <button class="when-choice" data-when="arrival" type="button">Ankunft um</button>
+        <button class="when-choice is-active" data-when="now" type="button">● <span data-i18n="journey.now">Jetzt</span></button>
+        <button class="when-choice" data-when="departure" type="button" data-i18n="journey.departureAt">Abfahrt um</button>
+        <button class="when-choice" data-when="arrival" type="button" data-i18n="journey.arrivalAt">Ankunft um</button>
         <input type="datetime-local" id="journey-when" class="journey-datetime" hidden />
       </div>
       <label class="wheelchair-toggle">
         <input type="checkbox" id="journey-wheelchair" />
-        <span>♿ Nur rollstuhlgerechte Verbindungen</span>
+        <span>♿ <span data-i18n="journey.wheelchair">Nur rollstuhlgerechte Verbindungen</span></span>
       </label>
       <div class="journey-options-row">
         <div class="transfer-slack-field">
-          <label for="journey-transfer-slack">Umstiegszeit-Puffer</label>
+          <label for="journey-transfer-slack" data-i18n="journey.transferSlack">Umstiegszeit-Puffer</label>
           <select id="journey-transfer-slack">
-            <option value="">Standard</option>
-            <option value="0">0 min (knapp)</option>
+            <option value="" data-i18n="journey.transferSlackDefault">Standard</option>
+            <option value="0" data-i18n="journey.transferSlack0">0 min (knapp)</option>
             <option value="3">3 min</option>
             <option value="5">5 min</option>
             <option value="10">10 min</option>
-            <option value="15">15 min (sicher)</option>
+            <option value="15" data-i18n="journey.transferSlack15">15 min (sicher)</option>
           </select>
         </div>
-        <button id="journey-submit" class="journey-submit" type="button">Verbindungen suchen <span>→</span></button>
+        <button id="journey-submit" class="journey-submit" type="button"><span data-i18n="journey.submit">Verbindungen suchen</span> <span>→</span></button>
       </div>
-      <p class="journey-source-note">🛰 Routenplanung über unsere selbst gehostete, offene Instanz (VBB-Region)</p>
+      <p class="journey-source-note" data-i18n="journey.sourceNote">🛰 Routenplanung über unsere selbst gehostete, offene Instanz (VBB-Region)</p>
       <div id="journey-share-row" class="journey-share-row" hidden>
-        <button id="journey-share-btn" class="text-button" type="button">🔗 Route teilen</button>
+        <button id="journey-share-btn" class="text-button" type="button">🔗 <span data-i18n="journey.share">Route teilen</span></button>
       </div>
       <div id="journey-results" class="journey-results"></div>
     </section>
 
     <section class="tab-panel" data-tab-panel="nearby" hidden>
-      <div class="panel-heading"><div><span class="section-heading__eyebrow">STANDORT</span><h1>In der Nähe</h1><p>Finde Haltestellen rund um deinen aktuellen Standort.</p></div></div>
-      <button id="nearby-locate" class="location-btn location-btn--wide">📍 Meinen Standort verwenden</button>
-      <div id="nearby-list" class="nearby-list"><div class="board-empty-state">Nutze deinen Standort, um Haltestellen in deiner Nähe zu finden.</div></div>
+      <div class="panel-heading"><div><span class="section-heading__eyebrow" data-i18n="nearby.eyebrow">STANDORT</span><h1 data-i18n="nearby.title">In der Nähe</h1><p data-i18n="nearby.text">Finde Haltestellen rund um deinen aktuellen Standort.</p></div></div>
+      <button id="nearby-locate" class="location-btn location-btn--wide">📍 <span data-i18n="nearby.locate">Meinen Standort verwenden</span></button>
+      <div id="nearby-list" class="nearby-list"><div class="board-empty-state" data-i18n="nearby.emptyState">Nutze deinen Standort, um Haltestellen in deiner Nähe zu finden.</div></div>
     </section>
 
     <section class="tab-panel" data-tab-panel="favorites" hidden>
       <div class="panel-heading">
-        <div><span class="section-heading__eyebrow">SCHNELLZUGRIFF</span><h1>Meine Haltestellen</h1><p>Deine gespeicherten Haltestellen mit Live-Abfahrten und Störungshinweisen.</p></div>
+        <div><span class="section-heading__eyebrow" data-i18n="favorites.eyebrow">SCHNELLZUGRIFF</span><h1 data-i18n="favorites.title">Meine Haltestellen</h1><p data-i18n="favorites.text">Deine gespeicherten Haltestellen mit Live-Abfahrten und Störungshinweisen.</p></div>
       </div>
       <div id="favorites-home" class="home-section">
         <div class="section-heading">
           <div></div>
-          <button id="notify-toggle" class="text-button" type="button" hidden>🔔 Störungsbenachrichtigungen aktivieren</button>
+          <button id="notify-toggle" class="text-button" type="button" hidden>🔔 <span data-i18n="favorites.enableNotify">Störungsbenachrichtigungen aktivieren</span></button>
         </div>
-        <p id="favorites-empty-hint" class="favorites-empty-hint">Noch keine Favoriten - tippe bei einer Haltestelle auf ☆, um sie hier anzupinnen.</p>
+        <p id="favorites-empty-hint" class="favorites-empty-hint" data-i18n="favorites.emptyHint">Noch keine Favoriten - tippe bei einer Haltestelle auf ☆, um sie hier anzupinnen.</p>
         <div id="favorite-cards" class="favorite-cards"></div>
       </div>
     </section>
 
     <section class="tab-panel" data-tab-panel="disruptions" hidden>
-      <div class="panel-heading"><div><span class="section-heading__eyebrow">AKTUELL</span><h1>Störungen</h1><p>Ortsbezogene und netzweite Hinweise.</p></div></div>
+      <div class="panel-heading"><div><span class="section-heading__eyebrow" data-i18n="common.current">AKTUELL</span><h1 data-i18n="disruptions.title">Störungen</h1><p data-i18n="disruptions.text">Ortsbezogene und netzweite Hinweise.</p></div></div>
       <div class="disruption-section">
-        <div class="section-heading"><div><h2>In deiner Nähe</h2></div></div>
-        <button id="disruptions-locate" class="location-btn location-btn--wide">📍 Standort verwenden</button>
-        <div id="nearby-disruptions-list" class="remarks-list"><div class="board-empty-state">Nutze deinen Standort für ortsbezogene Störungen.</div></div>
+        <div class="section-heading"><div><h2 data-i18n="disruptions.nearbyTitle">In deiner Nähe</h2></div></div>
+        <button id="disruptions-locate" class="location-btn location-btn--wide">📍 <span data-i18n="disruptions.useLocation">Standort verwenden</span></button>
+        <div id="nearby-disruptions-list" class="remarks-list"><div class="board-empty-state" data-i18n="disruptions.nearbyEmpty">Nutze deinen Standort für ortsbezogene Störungen.</div></div>
       </div>
       <div class="disruption-section">
-        <div class="section-heading"><div><h2>Netzweit</h2></div></div>
-        <div id="remarks-list" class="remarks-list"><div class="board-empty-state">Störungsmeldungen werden geladen…</div></div>
+        <div class="section-heading"><div><h2 data-i18n="disruptions.networkTitle">Netzweit</h2></div></div>
+        <div id="remarks-list" class="remarks-list"><div class="board-empty-state" data-i18n="disruptions.loading">Störungsmeldungen werden geladen…</div></div>
       </div>
     </section>
 
     <section class="tab-panel" data-tab-panel="fares" hidden>
-      <div class="panel-heading"><div><span class="section-heading__eyebrow">PREISE</span><h1>Tickets</h1><p>Übliche VBB-Fahrpreise auf einen Blick.</p></div></div>
-      <div class="disclaimer-banner">⚠ Angaben ohne Gewähr – Preise können sich ändern. <span id="fares-stand"></span></div>
-      <div id="fares-content"><div class="board-empty-state">Lade Fahrpreise…</div></div>
-      <div class="section-heading"><div><h2>Tickets kaufen</h2></div></div>
+      <div class="panel-heading"><div><span class="section-heading__eyebrow" data-i18n="fares.eyebrow">PREISE</span><h1 data-i18n="fares.title">Tickets</h1><p data-i18n="fares.text">Übliche VBB-Fahrpreise auf einen Blick.</p></div></div>
+      <div class="disclaimer-banner">⚠ <span data-i18n="fares.disclaimer">Angaben ohne Gewähr – Preise können sich ändern.</span> <span id="fares-stand"></span></div>
+      <div id="fares-content"><div class="board-empty-state" data-i18n="fares.loading">Lade Fahrpreise…</div></div>
+      <div class="section-heading"><div><h2 data-i18n="fares.buyTitle">Tickets kaufen</h2></div></div>
       <div id="fares-companies" class="company-links"></div>
     </section>
 
     <section class="tab-panel" data-tab-panel="more" hidden>
-      <div class="panel-heading"><div><span class="section-heading__eyebrow">WEITERE FUNKTIONEN</span><h1>Mehr</h1><p>Alles, was nicht bei jeder Fahrt gebraucht wird.</p></div></div>
+      <div class="panel-heading"><div><span class="section-heading__eyebrow" data-i18n="more.eyebrow">WEITERE FUNKTIONEN</span><h1 data-i18n="nav.more">Mehr</h1><p data-i18n="more.text">Alles, was nicht bei jeder Fahrt gebraucht wird.</p></div></div>
       <div class="more-grid">
-        <button class="more-card" data-open-tab="favorites" type="button"><span>★</span><strong>Favoriten</strong><small>Deine gespeicherten Haltestellen</small></button>
-        <button class="more-card" data-open-tab="nearby" type="button"><span>📍</span><strong>In der Nähe</strong><small>Haltestellen in deiner Umgebung</small></button>
-        <button class="more-card" data-open-tab="disruptions" type="button"><span>⚠</span><strong>Störungen</strong><small>Ortsbezogen &amp; netzweit</small></button>
-        <button class="more-card" data-open-tab="fares" type="button"><span>🎫</span><strong>Tickets</strong><small>Preise &amp; wo kaufen</small></button>
+        <button class="more-card" data-open-tab="favorites" type="button"><span>★</span><strong data-i18n="favorites.title">Favoriten</strong><small data-i18n="more.favoritesText">Deine gespeicherten Haltestellen</small></button>
+        <button class="more-card" data-open-tab="nearby" type="button"><span>📍</span><strong data-i18n="nearby.title">In der Nähe</strong><small data-i18n="more.nearbyText">Haltestellen in deiner Umgebung</small></button>
+        <button class="more-card" data-open-tab="disruptions" type="button"><span>⚠</span><strong data-i18n="disruptions.title">Störungen</strong><small data-i18n="more.disruptionsText">Ortsbezogen &amp; netzweit</small></button>
+        <button class="more-card" data-open-tab="fares" type="button"><span>🎫</span><strong data-i18n="fares.title">Tickets</strong><small data-i18n="more.faresText">Preise &amp; wo kaufen</small></button>
       </div>
       <div class="recent-section">
-        <div class="section-heading"><div><span class="section-heading__eyebrow">VERLAUF</span><h2>Zuletzt gesucht</h2></div><button id="clear-recent" class="text-button" type="button">Leeren</button></div>
+        <div class="section-heading"><div><span class="section-heading__eyebrow" data-i18n="more.historyEyebrow">VERLAUF</span><h2 data-i18n="more.historyTitle">Zuletzt gesucht</h2></div><button id="clear-recent" class="text-button" type="button" data-i18n="common.clear">Leeren</button></div>
         <div id="recent-searches" class="recent-searches"></div>
+      </div>
+      <div class="recent-section">
+        <div class="section-heading"><div><span class="section-heading__eyebrow" data-i18n="more.langEyebrow">SPRACHE / LANGUAGE</span><h2 data-i18n="more.langTitle">Sprache</h2></div></div>
+        <div class="lang-switch">
+          <button id="lang-de" class="lang-switch__btn" type="button" data-lang="de">Deutsch</button>
+          <button id="lang-en" class="lang-switch__btn" type="button" data-lang="en">English</button>
+        </div>
       </div>
     </section>
   </main>
 
-  <div class="global-disclaimer">ℹ Live-Daten von VBB · Angaben ohne Gewähr</div>
+  <div class="global-disclaimer" data-i18n="common.footer">ℹ Live-Daten von VBB · Angaben ohne Gewähr</div>
 
   <nav class="mobile-nav" aria-label="Hauptnavigation mobil">
-    <button class="mobile-nav__item is-active" data-tab="departures"><span>🚏</span><small>Abfahrten</small></button>
-    <button class="mobile-nav__item" data-tab="journey"><span>🧭</span><small>Route</small></button>
-    <button class="mobile-nav__item" data-tab="map"><span>🗺</span><small>Karte</small></button>
-    <button class="mobile-nav__item" data-tab="more"><span>☰</span><small>Mehr</small></button>
+    <button class="mobile-nav__item is-active" data-tab="departures"><span>🚏</span><small data-i18n="nav.departures">Abfahrten</small></button>
+    <button class="mobile-nav__item" data-tab="journey"><span>🧭</span><small data-i18n="nav.route">Route</small></button>
+    <button class="mobile-nav__item" data-tab="map"><span>🗺</span><small data-i18n="nav.map">Karte</small></button>
+    <button class="mobile-nav__item" data-tab="more"><span>☰</span><small data-i18n="nav.more">Mehr</small></button>
   </nav>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="js/config.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/api.js"></script>
   <script src="js/splitflap.js"></script>
   <script src="js/modefilter.js"></script>

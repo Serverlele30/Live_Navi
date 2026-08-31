@@ -140,5 +140,11 @@ const API = (() => {
     getSummaryDepartures(stations) {
       return postJson('/summary/departures', { stations });
     },
+
+    // Verspätungsstatistik pro Linie (siehe backend/src/utils/delayStats.js) -
+    // "sufficientData: false" bedeutet: noch zu wenige Datenpunkte gesammelt.
+    getLineDelayStats(line, days = 14) {
+      return request(`/stats/delays/${encodeURIComponent(line)}?${qs({ days })}`);
+    },
   };
 })();

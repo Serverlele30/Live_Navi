@@ -32,6 +32,7 @@ const TripModal = (() => {
           </div>
           <button class="trip-modal__close" type="button" aria-label="Schließen">×</button>
         </div>
+        <div class="trip-modal__stats" id="trip-modal-stats" hidden></div>
         <div class="trip-modal__map" id="trip-modal-map"></div>
         <div class="trip-modal__body" id="trip-modal-body">
           <div class="trip-modal__loading"><span class="spinner"></span>Lade Fahrt-Details…</div>
@@ -73,6 +74,33 @@ const TripModal = (() => {
   function formatTime(iso) {
     if (!iso) return null;
     return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Verspätungsstatistik pro Linie - Datenbasis wächst erst über Zeit, auf
+  // einem frisch aufgesetzten Server gibt es also erstmal nichts anzuzeigen.
+  async function loadLineStats(line) {
+    const el = document.getElementById('trip-modal-stats');
+    if (!el) return;
+    el.hidden = true;
+    if (!line) return;
+
+    try {
+      const stats = await API.getLineDelayStats(line);
+      if (!stats || !stats.sufficientData) return; // still hidden - keine Aussage besser als eine unsichere
+
+      const avgMin = Math.round(stats.avgDelaySeconds / 60);
+      const parts = [];
+      parts.push(avgMin > 0 ? `Ø +${avgMin} Min` : 'Ø pünktlich');
+      parts.push(`${stats.pctDelayed5plus}% ≥5 Min verspätet`);
+      if (stats.pctCancelled > 0) parts.push(`${stats.pctCancelled}% Ausfälle`);
+
+      el.textContent = `📊 ${parts.join(' · ')} (${stats.sampleCount} Fahrten, ${stats.days} Tage)`;
+      el.hidden = false;
+    } catch (err) {
+      // Statistik ist ein "nice to have" - bei Fehlern einfach ausblenden,
+      // ohne die eigentliche Fahrt-Detail-Ansicht zu stören.
+      console.error('Verspätungsstatistik-Fehler:', err.message);
+    }
   }
 
   function getAlarmOffset() {
@@ -183,9 +211,11 @@ const TripModal = (() => {
     currentTripId = tripId;
     currentTrip = null;
 
+    const statsEl = document.getElementById('trip-modal-stats');
+    if (statsEl) { statsEl.hidden = true; }
+
     document.getElementById('trip-modal-line').textContent = '…';
-    document.getElementById('trip-modal-line').style.background = '#8E99A6';
-    document.getElementById('trip-modal-direction').textContent = '';
+    document.getElementById('trip-modal-line').style.background = '#8E99A6';    document.getElementById('trip-modal-direction').textContent = '';
     document.getElementById('trip-modal-meta').textContent = '';
     document.getElementById('trip-modal-body').innerHTML = '<div class="trip-modal__loading"><span class="spinner"></span>Lade Fahrt-Details…</div>';
 
@@ -208,6 +238,8 @@ const TripModal = (() => {
     document.getElementById('trip-modal-meta').textContent = trip.cancelled
       ? 'Fahrt fällt aus'
       : `${trip.origin || ''} → ${trip.destination || ''}`;
+
+    loadLineStats(trip.line);
 
     // Mini-Karte mit dem Streckenverlauf zeichnen
     if (miniMap) { miniMap.remove(); miniMap = null; }
