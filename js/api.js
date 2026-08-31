@@ -34,6 +34,14 @@ const API = (() => {
     });
   }
 
+  function deleteJson(path, body) {
+    return request(path, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
   // Baut einen Query-String und lässt dabei undefined/null-Werte weg.
   function qs(params) {
     const parts = [];
@@ -145,6 +153,23 @@ const API = (() => {
     // "sufficientData: false" bedeutet: noch zu wenige Datenpunkte gesammelt.
     getLineDelayStats(line, days = 14) {
       return request(`/stats/delays/${encodeURIComponent(line)}?${qs({ days })}`);
+    },
+
+    // Web-Push (siehe js/push.js + backend/src/routes/webPush.js)
+    getPushPublicKey() {
+      return request('/webpush/public-key');
+    },
+    subscribePush(subscription, favorites) {
+      return postJson('/webpush/subscribe', { subscription, favorites });
+    },
+    unsubscribePush(endpoint) {
+      return postJson('/webpush/unsubscribe', { endpoint });
+    },
+    setPushTripAlarm(endpoint, alarm) {
+      return postJson('/webpush/trip-alarm', { endpoint, ...alarm });
+    },
+    clearPushTripAlarm(endpoint) {
+      return deleteJson('/webpush/trip-alarm', { endpoint });
     },
   };
 })();

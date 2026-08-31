@@ -1766,7 +1766,11 @@ button:active { transform: translateY(1px); }
   .transfer-slack-field select { width: 100%; }
   .mobile-nav {
     display: grid; grid-template-columns: repeat(4, 1fr); position: fixed; bottom: 0; left: 0; right: 0;
-    z-index: 50; background: rgba(23,30,38,.97); border-top: 1px solid var(--line); padding: 5px 4px calc(5px + env(safe-area-inset-bottom));
+    /* Muss über der (jetzt display-breiten) Live-Karte liegen - Leaflet nutzt
+       für seine eigenen Steuerelemente (Zoom-Buttons etc.) intern z-index-
+       Werte bis ~1000, das HUD/die Navigation soll aber immer sichtbar und
+       bedienbar bleiben, unabhängig von der Karte. */
+    z-index: 1100; background: rgba(23,30,38,.97); border-top: 1px solid var(--line); padding: 5px 4px calc(5px + env(safe-area-inset-bottom));
   }
   .mobile-nav__item { border: 0; background: transparent; color: var(--ink-muted); padding: 5px 2px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
   .mobile-nav__item span { font-size: 18px; line-height: 1.1; }

@@ -30,6 +30,12 @@ const TripAlarm = (() => {
     renderBanner();
     restartPolling();
     check(); // sofort einmal prüfen statt erst nach POLL_MS zu warten
+
+    // Best effort: Alarm zusätzlich serverseitig spiegeln, damit er auch bei
+    // geschlossenem Tab/Browser noch auslöst. Schlägt das fehl (Push nicht
+    // aktiviert/unterstützt), läuft der normale Tab-lokale Alarm unverändert
+    // weiter - das hier ist rein additiv.
+    if (window.Push) Push.syncTripAlarm({ tripId, source: 'vbb', line, targetName, targetIndex, stopsBefore: alarm.stopsBefore });
   }
 
   function clear() {
@@ -39,6 +45,7 @@ const TripAlarm = (() => {
     stopPolling();
     hideBanner();
     hideOverlay();
+    if (window.Push) Push.clearTripAlarm();
   }
 
   function getActive() {

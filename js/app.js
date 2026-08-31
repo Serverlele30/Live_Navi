@@ -134,6 +134,7 @@ const App = (() => {
     renderFavoriteChips();
     renderRecentSearches();
     updateFavoriteButton();
+    if (window.Push) Push.syncFavorites(favorites);
   }
 
   function renderFavoriteChips() {
@@ -339,9 +340,22 @@ const App = (() => {
     if (!btn || !window.Notification) return;
     btn.addEventListener('click', async () => {
       try {
-        await Notification.requestPermission();
+        // Volles Web-Push-Abo statt nur lokaler Notification-Erlaubnis -
+        // funktioniert dadurch auch, wenn der Tab/Browser geschlossen ist.
+        // Fällt automatisch auf den bisherigen, rein Tab-lokalen Push zurück,
+        // falls der Browser Web-Push nicht unterstützt oder der Server es
+        // nicht konfiguriert hat (Push.enable() wirft dann einen Fehler, den
+        // wir hier abfangen - die Tab-lokalen Benachrichtigungen laufen so
+        // oder so über den normalen Notification.requestPermission()-Pfad
+        // weiter, den Push.enable() intern mit aufruft).
+        if (window.Push && Push.isSupported()) {
+          await Push.enable(loadFavorites());
+        } else {
+          await Notification.requestPermission();
+        }
       } catch (err) {
-        console.error('Notification-Permission-Fehler:', err.message);
+        console.error('Benachrichtigungen aktivieren fehlgeschlagen:', err.message);
+        showToast(err.message, 'warning');
       }
       updateNotifyToggleVisibility(loadFavorites().length > 0);
     });
@@ -1262,6 +1276,7 @@ const App = (() => {
 
   function init() {
     I18N.init();
+    if (window.Push && Push.isSupported()) Push.registerServiceWorker();
     I18N.setOnLangChange(() => {
       // [data-i18n]-Elemente übernimmt I18N.applyStaticTranslations() bereits
       // selbst - hier nur die dynamisch (per JS-Template) erzeugten Bereiche
