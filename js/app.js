@@ -2,10 +2,13 @@ const App = (() => {
   const FAVORITES_KEY = 'oepnv-navi:db-favorites';
   const LAST_STOP_KEY = 'oepnv-navi:db-last-stop';
   const RECENT_SEARCHES_KEY = 'oepnv-navi:db-recent-searches';
+  const SEEN_DISRUPTIONS_KEY = 'oepnv-navi:db-seen-disruptions';
+  const FAVORITES_POLL_MS = 30000;
 
   let currentStop = null;
   let departuresPollHandle = null;
   let departuresModeFilter = null;
+  let favoritesPollHandle = null;
 
   let journeyFrom = null;
   let journeyTo = null;
@@ -102,6 +105,7 @@ const App = (() => {
           <span>
             <strong>${escapeHtml(fav.name)}</strong>
             <small class="favorite-card__next" data-next-departure>Lade nächste Abfahrt…</small>
+            <small class="favorite-card__disruption" data-disruption hidden></small>
           </span>
           <span class="favorite-card__arrow">→</span>
         `;
@@ -115,37 +119,186 @@ const App = (() => {
     const home = document.getElementById('favorites-home');
     if (home) home.hidden = favorites.length === 0;
 
-    if (favorites.length > 0) loadFavoriteNextDepartures(favorites);
+    updateNotifyToggleVisibility(favorites.length > 0);
+
+    if (favorites.length > 0) {
+      loadFavoriteNextDepartures(favorites);
+      startFavoritesPolling();
+    } else {
+      stopFavoritesPolling();
+    }
+  }
+
+  // ---------- Störungs-Erkennung für Favoriten ("Störungs-Push") ----------
+  //
+  // Läuft im Hintergrund, solange Favoriten vorhanden sind (siehe
+  // startFavoritesPolling). Vergleicht bei jedem Poll die von /summary/departures
+  // gelieferten Störungen einer Haltestelle mit den zuletzt gesehenen (in
+  // localStorage gemerkt) und meldet nur wirklich NEUE Störungen - sonst würde
+  // bei jedem 30s-Poll erneut benachrichtigt werden, solange eine Störung andauert.
+
+  function loadSeenDisruptions() {
+    try { return JSON.parse(localStorage.getItem(SEEN_DISRUPTIONS_KEY)) || {}; }
+    catch (_) { return {}; }
+  }
+
+  function saveSeenDisruptions(map) {
+    localStorage.setItem(SEEN_DISRUPTIONS_KEY, JSON.stringify(map));
+  }
+
+  function disruptionKey(d) {
+    return d.id || `${d.type || ''}-${d.text || d.summary || ''}`;
+  }
+
+  function notifyNewDisruption(favName, disruption) {
+    const message = `${favName}: ${disruption.summary || 'Neue Störung'}`;
+    showToast(message, 'warning');
+
+    if (window.Notification && Notification.permission === 'granted') {
+      try {
+        new Notification('Störung bei ' + favName, {
+          body: disruption.summary || disruption.text || 'Es liegt eine neue Störungsmeldung vor.',
+          tag: `oepnv-navi-disruption-${favName}-${disruptionKey(disruption)}`,
+        });
+      } catch (err) {
+        console.error('Notification-Fehler:', err.message);
+      }
+    }
+  }
+
+  function renderFavoriteDisruption(card, favName, disruptions, seenMap, favId) {
+    const el = card.querySelector('[data-disruption]');
+    if (!el) return;
+
+    if (!disruptions || disruptions.length === 0) {
+      el.hidden = true;
+      el.textContent = '';
+      card.classList.remove('favorite-card--disrupted');
+      delete seenMap[favId];
+      return;
+    }
+
+    card.classList.add('favorite-card--disrupted');
+    el.hidden = false;
+    el.textContent = `⚠ ${disruptions[0].summary || 'Störung'}${disruptions.length > 1 ? ` (+${disruptions.length - 1} weitere)` : ''}`;
+
+    const previousKeys = new Set(seenMap[favId] || []);
+    disruptions.forEach((d) => {
+      const key = disruptionKey(d);
+      if (!previousKeys.has(key)) {
+        notifyNewDisruption(favName, d);
+      }
+    });
+    seenMap[favId] = disruptions.map(disruptionKey);
   }
 
   async function loadFavoriteNextDepartures(favorites) {
     const stations = favorites.map((f) => ({ id: f.id, source: f.source || 'vbb', name: f.name }));
+    const seenMap = loadSeenDisruptions();
+
     try {
       const { results } = await API.getSummaryDepartures(stations);
       results.forEach((r) => {
         const card = document.querySelector(`.favorite-card[data-fav-id="${CSS.escape(String(r.id))}"]`);
         if (!card) return;
         const el = card.querySelector('[data-next-departure]');
-        if (!el) return;
 
-        if (r.error || !r.nextDeparture) {
-          el.textContent = 'Keine Abfahrt gefunden';
-          return;
+        if (el) {
+          if (r.error || !r.nextDeparture) {
+            el.textContent = 'Keine Abfahrt gefunden';
+          } else {
+            const dep = r.nextDeparture;
+            const minutesUntil = dep.when ? Math.max(0, Math.round((new Date(dep.when) - new Date()) / 60000)) : null;
+            if (dep.cancelled) {
+              el.innerHTML = `<span class="favorite-card__cancelled">${escapeHtml(dep.line || '')} fällt aus</span>`;
+            } else {
+              el.textContent = `${dep.line || '?'} → ${dep.direction || ''} · ${minutesUntil != null ? minutesUntil + ' min' : ''}`;
+            }
+          }
         }
 
-        const dep = r.nextDeparture;
-        const minutesUntil = dep.when ? Math.max(0, Math.round((new Date(dep.when) - new Date()) / 60000)) : null;
-        if (dep.cancelled) {
-          el.innerHTML = `<span class="favorite-card__cancelled">${escapeHtml(dep.line || '')} fällt aus</span>`;
-        } else {
-          el.textContent = `${dep.line || '?'} → ${dep.direction || ''} · ${minutesUntil != null ? minutesUntil + ' min' : ''}`;
-        }
+        renderFavoriteDisruption(card, r.name || '', r.disruptions, seenMap, r.id);
       });
+      saveSeenDisruptions(seenMap);
     } catch (err) {
       // Stillschweigend ignorieren - die Karten zeigen dann weiterhin "Lade..."
       // bzw. der Nutzer bekommt die Abfahrten trotzdem beim Antippen der Karte.
       console.error('Sammel-Abfahrten-Fehler:', err.message);
     }
+  }
+
+  function startFavoritesPolling() {
+    if (favoritesPollHandle) clearInterval(favoritesPollHandle);
+    favoritesPollHandle = setInterval(() => {
+      const favorites = loadFavorites();
+      if (favorites.length > 0) loadFavoriteNextDepartures(favorites);
+      else stopFavoritesPolling();
+    }, FAVORITES_POLL_MS);
+  }
+
+  function stopFavoritesPolling() {
+    if (favoritesPollHandle) {
+      clearInterval(favoritesPollHandle);
+      favoritesPollHandle = null;
+    }
+  }
+
+  // ---------- Toast (kurze, unaufdringliche In-App-Meldung) ----------
+
+  function showToast(message, variant = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast--${variant}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    requestAnimationFrame(() => toast.classList.add('is-visible'));
+
+    setTimeout(() => {
+      toast.classList.remove('is-visible');
+      setTimeout(() => toast.remove(), 300);
+    }, 6000);
+  }
+
+  // ---------- Browser-Benachrichtigungen an/aus ----------
+
+  function updateNotifyToggleVisibility(hasFavorites) {
+    const btn = document.getElementById('notify-toggle');
+    if (!btn) return;
+    if (!hasFavorites || !window.Notification) {
+      btn.hidden = true;
+      return;
+    }
+    btn.hidden = false;
+    if (Notification.permission === 'granted') {
+      btn.textContent = '🔔 Benachrichtigungen aktiv';
+      btn.classList.add('is-active');
+      btn.disabled = true;
+    } else if (Notification.permission === 'denied') {
+      btn.textContent = '🔕 Benachrichtigungen blockiert';
+      btn.classList.remove('is-active');
+      btn.disabled = true;
+    } else {
+      btn.textContent = '🔔 Störungsbenachrichtigungen aktivieren';
+      btn.classList.remove('is-active');
+      btn.disabled = false;
+    }
+  }
+
+  function initNotifications() {
+    const btn = document.getElementById('notify-toggle');
+    if (!btn || !window.Notification) return;
+    btn.addEventListener('click', async () => {
+      try {
+        await Notification.requestPermission();
+      } catch (err) {
+        console.error('Notification-Permission-Fehler:', err.message);
+      }
+      updateNotifyToggleVisibility(loadFavorites().length > 0);
+    });
+    updateNotifyToggleVisibility(loadFavorites().length > 0);
   }
 
   function updateFavoriteButton() {
@@ -831,6 +984,7 @@ const App = (() => {
     initJourneyPlanner();
     initNearby();
     initNearbyDisruptions();
+    initNotifications();
     renderFavoriteChips();
     renderRecentSearches();
 

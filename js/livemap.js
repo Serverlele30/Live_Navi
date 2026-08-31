@@ -20,6 +20,7 @@ const LiveMap = (() => {
   let radarPollHandle = null;
   let tripPollHandle = null;
   let currentTripId = null;
+  let isolatedMarker = null; // persistenter Marker im Isolations-Modus, wird nur aktualisiert statt neu erzeugt
   let isolatedVehicleMeta = null; // { line, color, textColor } für die Banner-Anzeige
   let getModesParam = () => null; // wird von außen (ModeFilter) gesetzt
 
@@ -57,6 +58,11 @@ const LiveMap = (() => {
   function polylineToLatLngs(geojson) {
     if (!geojson || !geojson.features) return [];
     return geojson.features.map((f) => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
+  }
+
+  function vehiclePopupHtml(v) {
+    return `<strong>${v.line || 'Linie unbekannt'}</strong><br>${v.direction || ''}<br>` +
+      `<small>Nächster Halt: ${v.nextStopover || '–'}</small>`;
   }
 
   // ---------- Radar-Modus (Standard: alle Fahrzeuge im Ausschnitt) ----------
@@ -130,21 +136,57 @@ const LiveMap = (() => {
       return;
     }
 
-    radarLayer.clearLayers();
     const v = data.vehicles[0];
-    if (v && v.latitude != null && v.longitude != null) {
-      const marker = L.marker([v.latitude, v.longitude], { icon: vehicleIcon(v.line, v.color, v.textColor) });
-      marker.bindPopup(`<strong>${v.line || ''}</strong><br>${v.direction || ''}<br><small>Nächster Halt: ${v.nextStopover || '–'}</small>`);
-      marker.addTo(radarLayer);
+    if (!v || v.latitude == null || v.longitude == null) {
+      // Fahrzeug gerade nicht meldend (z.B. kurzzeitig aus der Live-Erfassung) -
+      // Marker stehen lassen statt zu entfernen, nächster Poll aktualisiert ihn wieder.
+      return;
     }
+
+    // WICHTIG: Marker wird wiederverwendet statt bei jedem Poll neu erzeugt zu
+    // werden. Vorher wurde hier radarLayer.clearLayers() + ein komplett neuer
+    // Marker angelegt - das hat ein ggf. geöffnetes Popup jedes Mal geschlossen,
+    // sodass die Fahrzeuginfo (Richtung, nächster Halt) nach dem ersten Klick nie
+    // wieder aktualisiert im UI sichtbar wurde.
+    if (isolatedMarker) {
+      isolatedMarker.setLatLng([v.latitude, v.longitude]);
+      isolatedMarker.setIcon(vehicleIcon(v.line, v.color, v.textColor));
+      isolatedMarker.setPopupContent(vehiclePopupHtml(v));
+    } else {
+      isolatedMarker = L.marker([v.latitude, v.longitude], { icon: vehicleIcon(v.line, v.color, v.textColor) });
+      isolatedMarker.bindPopup(vehiclePopupHtml(v));
+      isolatedMarker.addTo(radarLayer);
+    }
+
+    isolatedVehicleMeta = { line: v.line, color: v.color, textColor: v.textColor };
+    updateIsolationBanner();
   }
 
   async function isolateVehicle(vehicle) {
     if (!vehicle || !vehicle.tripId) return;
+
+    // Das ursprüngliche Leaflet-Popup des angeklickten Radar-Markers (aus
+    // bindPopup in refreshRadar) schließen, bevor wir in den Isolations-Modus
+    // wechseln - sonst blitzt es kurz auf und verschwindet dann kommentarlos.
+    map.closePopup();
+
     setMode('isolated');
     currentTripId = vehicle.tripId;
+    isolatedMarker = null;
+    radarLayer.clearLayers();
+
     isolatedVehicleMeta = { line: vehicle.line, color: vehicle.color, textColor: vehicle.textColor };
     updateIsolationBanner();
+
+    // Sofort einen Marker mit den Daten aus dem Klick anzeigen (nicht erst auf
+    // den ersten Poll warten) und direkt öffnen, damit man die Fahrzeuginfo
+    // ohne weiteren Klick sieht.
+    isolatedMarker = L.marker([vehicle.latitude, vehicle.longitude], {
+      icon: vehicleIcon(vehicle.line, vehicle.color, vehicle.textColor),
+    });
+    isolatedMarker.bindPopup(vehiclePopupHtml(vehicle));
+    isolatedMarker.addTo(radarLayer);
+    isolatedMarker.openPopup();
 
     routeLayer.clearLayers();
     try {
@@ -159,13 +201,13 @@ const LiveMap = (() => {
       console.error('Trip-Polyline-Fehler:', err.message);
     }
 
-    refreshIsolated();
     if (radarPollHandle) clearInterval(radarPollHandle);
     radarPollHandle = setInterval(refreshIsolated, 10000);
   }
 
   function clearIsolation() {
     currentTripId = null;
+    isolatedMarker = null;
     isolatedVehicleMeta = null;
     updateIsolationBanner();
     startRadar();
@@ -211,12 +253,19 @@ const LiveMap = (() => {
 
     if (data.currentLocation) {
       const pos = [data.currentLocation.latitude, data.currentLocation.longitude];
+      const popupHtml = `<strong>${data.line || ''}</strong><br>→ ${data.direction || ''}`;
       if (tripMarker) {
         tripMarker.setLatLng(pos);
+        tripMarker.setIcon(vehicleIcon(data.line, data.color, data.textColor));
+        // setPopupContent statt erneutem bindPopup, sonst schließt sich ein
+        // gerade geöffnetes Popup bei jedem Poll wieder (gleicher Fehler wie
+        // im Isolations-Modus).
+        if (tripMarker.getPopup()) tripMarker.setPopupContent(popupHtml);
+        else tripMarker.bindPopup(popupHtml);
       } else {
         tripMarker = L.marker(pos, { icon: vehicleIcon(data.line, data.color, data.textColor) }).addTo(routeLayer);
+        tripMarker.bindPopup(popupHtml);
       }
-      tripMarker.bindPopup(`<strong>${data.line || ''}</strong><br>→ ${data.direction || ''}`);
     }
   }
 

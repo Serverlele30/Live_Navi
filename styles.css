@@ -852,6 +852,55 @@ button:active { transform: translateY(1px); }
 .favorite-card small { color: var(--ink-muted); font-size: 11px; margin-top: 3px; }
 .favorite-card__cancelled { color: var(--signal-red); font-weight: 600; }
 .favorite-card__arrow { color: var(--ink-muted); font-size: 18px; }
+
+/* Störungs-Hinweis auf Favoriten-Karten ("Störungs-Push") */
+.favorite-card--disrupted { border-color: rgba(255,93,108,.5); }
+.favorite-card__disruption {
+  color: var(--signal-red) !important;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.notify-toggle, #notify-toggle.is-active { color: var(--signal-green); }
+#notify-toggle:disabled { cursor: default; opacity: .8; }
+
+/* ============================================================
+   Toast-Benachrichtigungen (z.B. für neue Störungen bei Favoriten)
+   ============================================================ */
+
+.toast-container {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--signal-amber);
+  color: var(--ink);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  width: 100%;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity .25s ease, transform .25s ease;
+}
+
+.toast.is-visible { opacity: 1; transform: translateY(0); }
+.toast--warning { border-left-color: var(--signal-red); }
+.toast--info { border-left-color: var(--signal-amber); }
 .nearby-preview { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
 .nearby-preview__item {
   display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left;
@@ -1437,6 +1486,7 @@ button:active { transform: translateY(1px); }
   .mobile-nav__item span { font-size: 18px; line-height: 1.1; }
   .mobile-nav__item small { font-size: 10px; }
   .mobile-nav__item.is-active { color: var(--signal-amber); }
+  .toast-container { bottom: calc(64px + env(safe-area-inset-bottom) + 12px); }
 }
 
 @media (max-width: 430px) {
