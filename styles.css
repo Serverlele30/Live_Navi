@@ -13,6 +13,7 @@
   --signal-amber: #F5A623;
   --signal-green: #3DDC84;
   --signal-red: #FF5D6C;
+  --signal-blue: #4FA8E8;
 
   --font-display: 'IBM Plex Mono', 'SFMono-Regular', monospace;
   --font-body: 'IBM Plex Sans', -apple-system, sans-serif;
@@ -366,6 +367,41 @@ button {
   font-family: var(--font-display);
 }
 
+/* Gleiswechsel-Hinweis */
+.flap-cell--platform-changed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  white-space: normal;
+}
+
+.platform-changed-flag {
+  display: inline-block;
+  background: var(--signal-red);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  padding: 3px 7px;
+  border-radius: 4px;
+  width: fit-content;
+  animation: platform-changed-pulse 1s ease-out 2;
+}
+
+.platform-changed-original {
+  color: var(--signal-red);
+  font-size: 10px;
+  opacity: 0.85;
+  text-decoration: line-through;
+  font-family: var(--font-display);
+}
+
+@keyframes platform-changed-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 93, 108, 0.55); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 93, 108, 0); }
+}
+
 .flap-field--line {
   align-items: flex-start;
   padding-right: 18px;
@@ -393,9 +429,15 @@ button {
    Live-Karte
    ============================================================ */
 
+/* Mobile-First-Basis: sinnvoller Startwert für kleine Displays, bevor
+   livemap.js die Höhe zur Laufzeit anhand des tatsächlich verfügbaren
+   Platzes exakt nachjustiert (siehe resizeToViewport() in livemap.js).
+   dvh (dynamische Viewport-Höhe) berücksichtigt ein-/ausblendende mobile
+   Adressleisten korrekt; vh davor dient als Fallback für ältere Browser. */
 .live-map {
-  height: calc(100vh - var(--header-height) - 160px);
-  min-height: 400px;
+  height: min(70vh, 560px);
+  height: min(70dvh, 560px);
+  min-height: 320px;
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--line);
@@ -617,6 +659,13 @@ button {
   margin-bottom: 8px;
 }
 
+.remark-card__text a,
+.station-disruption__item a,
+.elevator-status__item a {
+  color: var(--signal-amber);
+  text-decoration: underline;
+}
+
 .remark-card__meta {
   color: var(--ink-muted);
   font-size: 12px;
@@ -794,6 +843,21 @@ button:active { transform: translateY(1px); }
 }
 .search-clear:hover { background: var(--panel); color: var(--ink); }
 
+.header-icon-btn {
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  background: var(--panel-raised);
+  color: var(--signal-amber);
+  font-size: 18px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.header-icon-btn:hover { border-color: var(--signal-amber); }
+
 .favorites-bar { display: none; }
 .tab-nav {
   max-width: 1120px;
@@ -921,7 +985,15 @@ button:active { transform: translateY(1px); }
 .flap-cell--time { font-size: 17px; }
 .flap-cell--direction { font-size: 15px; font-weight: 600; }
 .flap-cell--platform { font-size: 14px; }
-.station-disruption { background: rgba(255,93,108,.08); border: 1px solid rgba(255,93,108,.3); color: var(--ink); border-radius: 9px; padding: 10px 12px; margin-bottom: 12px; font-size: 12px; }
+.station-disruption { background: rgba(255,93,108,.08); border: 1px solid rgba(255,93,108,.3); color: var(--ink); border-radius: 9px; padding: 10px 12px; margin-top: 14px; font-size: 12px; }
+.station-disruption__item { line-height: 1.5; }
+.station-disruption__item + .station-disruption__item { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,93,108,.25); }
+
+/* Aufzugsstatus - eigener, ruhigerer Ton (Info, nicht "akute Störung") */
+.elevator-status { background: rgba(79,168,232,.08); border: 1px solid rgba(79,168,232,.3); color: var(--ink); border-radius: 9px; padding: 10px 12px; margin-top: 14px; font-size: 12px; }
+.elevator-status__item { line-height: 1.5; }
+.elevator-status__item + .elevator-status__item { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(79,168,232,.25); }
+.elevator-status__item strong { color: var(--signal-blue); }
 
 .panel-heading { margin-bottom: 22px; }
 .panel-heading h1 { font-size: 26px; margin-bottom: 6px; }
@@ -939,10 +1011,39 @@ button:active { transform: translateY(1px); }
 .journey-input-marker--end { color: var(--signal-red); }
 .journey-connector { height: 13px; border-left: 1px solid var(--line); margin-left: 10px; }
 .journey-when { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
+
+.wheelchair-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink);
+  margin: 0 0 12px;
+  cursor: pointer;
+  width: fit-content;
+}
+.wheelchair-toggle input { accent-color: var(--signal-amber); width: 16px; height: 16px; }
 .when-choice { background: var(--panel); color: var(--ink-muted); border: 1px solid var(--line); border-radius: 999px; padding: 7px 11px; font-size: 12px; }
 .when-choice.is-active { color: var(--signal-amber); border-color: var(--signal-amber); background: rgba(245,166,35,.08); }
 .journey-options-row { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
 .journey-options-row .mode-filter { margin-bottom: 0; }
+
+.transfer-slack-field { display: flex; flex-direction: column; gap: 5px; }
+.transfer-slack-field label {
+  color: var(--ink-muted);
+  font: 600 10px var(--font-label);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.transfer-slack-field select {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+}
 .journey-submit { min-height: 38px; padding: 9px 15px; }
 .journey-submit span { margin-left: 6px; }
 .journey-card { padding: 16px; }
@@ -956,10 +1057,28 @@ button:active { transform: translateY(1px); }
 .more-card:hover { border-color: var(--signal-amber); }
 .recent-section { margin-top: 28px; }
 .recent-searches { display: flex; flex-wrap: wrap; gap: 8px; }
-.recent-item { display: inline-flex; align-items: center; gap: 7px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; font-size: 12px; }
+.recent-item {
+  display: inline-flex; align-items: center; gap: 2px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+  padding: 2px 4px 2px 2px; font-size: 12px;
+}
 .recent-item:hover { border-color: var(--signal-amber); }
-.recent-item span { color: var(--ink-muted); }
+.recent-item__select { display: inline-flex; align-items: center; gap: 7px; background: none; border: 0; color: var(--ink); padding: 6px 4px 6px 10px; font-size: 12px; font-family: inherit; }
+.recent-item__select span { color: var(--ink-muted); }
+.recent-item__remove {
+  background: none; border: 0; color: var(--ink-muted); width: 22px; height: 22px;
+  border-radius: 50%; font-size: 15px; line-height: 1; flex-shrink: 0;
+}
+.recent-item__remove:hover { background: var(--panel-raised); color: var(--signal-red); }
 .recent-empty { color: var(--ink-muted); font-size: 12px; padding: 8px 0; }
+
+.search-result-heading {
+  padding: 8px 12px 4px;
+  color: var(--ink-muted);
+  font: 600 10px var(--font-label);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
 
 .mobile-nav { display: none; }
 
@@ -1136,6 +1255,140 @@ button:active { transform: translateY(1px); }
 .trip-stopover__time--cancelled {
   color: var(--signal-red);
   text-decoration: line-through;
+}
+
+/* ============================================================
+   Fahrtalarm: Offset-Auswahl, Glocken-Buttons an den Zwischenhalten,
+   Hinweis-Banner und Vollbild-Overlay bei Auslösung
+   ============================================================ */
+
+.trip-alarm-offset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.trip-alarm-offset-row select {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.trip-alarm-offset-row small {
+  color: var(--ink-muted);
+  width: 100%;
+}
+
+.trip-stopover__alarm-btn {
+  background: none;
+  border: 0;
+  font-size: 16px;
+  padding: 2px 4px;
+  line-height: 1;
+  opacity: .6;
+}
+
+.trip-stopover__alarm-btn:hover { opacity: 1; }
+.trip-stopover__alarm-btn.is-active { opacity: 1; filter: drop-shadow(0 0 4px rgba(245,166,35,.6)); }
+
+.trip-alarm-banner {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 190;
+  background: var(--panel-raised);
+  border: 1px solid var(--signal-amber);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 13px;
+  width: min(480px, calc(100vw - 32px));
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+
+.trip-alarm-banner.is-visible { display: flex; }
+.trip-alarm-banner__text { flex: 1; }
+
+.trip-alarm-banner button {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.trip-alarm-banner button:hover { border-color: var(--signal-amber); }
+
+.trip-alarm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(12, 17, 22, .92);
+  animation: trip-modal-fade 0.2s ease;
+}
+
+.trip-alarm-overlay[hidden] { display: none; }
+
+.trip-alarm-overlay__card {
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--signal-amber);
+  border-radius: 16px;
+  padding: 36px 28px;
+  max-width: 340px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+
+.trip-alarm-overlay__icon {
+  font-size: 46px;
+  margin-bottom: 8px;
+  animation: trip-alarm-ring 0.6s ease-in-out infinite;
+}
+
+@keyframes trip-alarm-ring {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-12deg); }
+  75% { transform: rotate(12deg); }
+}
+
+.trip-alarm-overlay__card h2 {
+  margin: 0 0 10px;
+  font-size: 22px;
+}
+
+.trip-alarm-overlay__card p {
+  margin: 0 0 20px;
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+
+.trip-alarm-overlay__card button {
+  background: var(--signal-amber);
+  color: #17110a;
+  border: 0;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-weight: 600;
+  font-size: 14px;
 }
 
 /* ============================================================
@@ -1477,7 +1730,7 @@ button:active { transform: translateY(1px); }
   .journey-options-row { display: block; }
   .journey-options-row .journey-submit { width: 100%; margin-top: 8px; }
   .journey-options-row .mode-filter { margin-bottom: 8px; }
-  .live-map { min-height: 62vh; height: 62vh; }
+  .transfer-slack-field select { width: 100%; }
   .mobile-nav {
     display: grid; grid-template-columns: repeat(4, 1fr); position: fixed; bottom: 0; left: 0; right: 0;
     z-index: 50; background: rgba(23,30,38,.97); border-top: 1px solid var(--line); padding: 5px 4px calc(5px + env(safe-area-inset-bottom));
@@ -1501,3 +1754,5 @@ button:active { transform: translateY(1px); }
   text-align: center;
   margin: 4px 0 14px;
 }
+
+.journey-share-row { display: flex; justify-content: flex-end; margin-bottom: 8px; }

@@ -3,6 +3,8 @@ const App = (() => {
   const LAST_STOP_KEY = 'oepnv-navi:db-last-stop';
   const RECENT_SEARCHES_KEY = 'oepnv-navi:db-recent-searches';
   const SEEN_DISRUPTIONS_KEY = 'oepnv-navi:db-seen-disruptions';
+  const TRANSFER_SLACK_KEY = 'oepnv-navi:db-transfer-slack';
+  const WHEELCHAIR_KEY = 'oepnv-navi:db-wheelchair';
   const FAVORITES_POLL_MS = 30000;
 
   let currentStop = null;
@@ -41,7 +43,13 @@ const App = (() => {
     if (!station || !station.name) return;
     const items = loadRecentSearches().filter((item) => item.id !== station.id);
     items.unshift({ id: station.id, name: station.name, source: station.source });
-    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(items.slice(0, 6)));
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(items.slice(0, 8)));
+    renderRecentSearches();
+  }
+
+  function removeRecentSearch(id) {
+    const items = loadRecentSearches().filter((item) => item.id !== id);
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(items));
     renderRecentSearches();
   }
 
@@ -55,16 +63,63 @@ const App = (() => {
       return;
     }
     items.forEach((item) => {
-      const button = document.createElement('button');
-      button.className = 'recent-item';
-      button.innerHTML = `<span>↺</span><strong>${escapeHtml(item.name)}</strong>`;
-      button.addEventListener('click', () => selectStation(item));
-      container.appendChild(button);
+      const wrap = document.createElement('div');
+      wrap.className = 'recent-item';
+
+      const select = document.createElement('button');
+      select.type = 'button';
+      select.className = 'recent-item__select';
+      select.innerHTML = `<span>↺</span><strong>${escapeHtml(item.name)}</strong>`;
+      select.addEventListener('click', () => selectStation(item));
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'recent-item__remove';
+      remove.setAttribute('aria-label', `${item.name} aus Verlauf entfernen`);
+      remove.textContent = '×';
+      remove.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeRecentSearch(item.id);
+      });
+
+      wrap.appendChild(select);
+      wrap.appendChild(remove);
+      container.appendChild(wrap);
     });
   }
 
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
+  }
+
+  // VBB-Störungstexte (HAFAS-remarks) enthalten gelegentlich einen eingebetteten
+  // "[MEHR/MORE]"-Link zur offiziellen Störungsmeldung, z.B.:
+  //   Bauarbeiten ... <a href="https://www.bvg.de/...">[MEHR/MORE]</a>
+  // escapeHtml() allein macht daraus nur sichtbaren Text statt eines klickbaren
+  // Links. Diese Funktion erlaubt gezielt NUR <a href="http(s)://...">Label</a> -
+  // alles andere (auch verschachtelte Tags im Label) wird escaped, damit aus den
+  // Störungsmeldungen kein beliebiges HTML/Script eingeschleust werden kann.
+  function linkifyRemarkText(raw) {
+    if (!raw) return '';
+    const anchorRegex = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    let result = '';
+    let lastIndex = 0;
+    let match;
+
+    while ((match = anchorRegex.exec(raw)) !== null) {
+      result += escapeHtml(raw.slice(lastIndex, match.index));
+      const href = match[1];
+      const label = match[2].replace(/<[^>]*>/g, '').trim();
+      if (/^https?:\/\//i.test(href)) {
+        result += `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label || href)}</a>`;
+      } else {
+        // Unbekanntes/unsicheres Ziel - lieber nur als Text zeigen als verlinken.
+        result += escapeHtml(label);
+      }
+      lastIndex = anchorRegex.lastIndex;
+    }
+    result += escapeHtml(raw.slice(lastIndex));
+    return result;
   }
 
   function toggleFavorite(station) {
@@ -82,20 +137,11 @@ const App = (() => {
   }
 
   function renderFavoriteChips() {
-    const container = document.getElementById('favorite-chips');
     const cardContainer = document.getElementById('favorite-cards');
     const favorites = loadFavorites();
-    if (container) container.innerHTML = '';
     if (cardContainer) cardContainer.innerHTML = '';
 
     favorites.forEach((fav) => {
-      if (container) {
-        const chip = document.createElement('button');
-        chip.className = 'chip';
-        chip.textContent = fav.name;
-        chip.addEventListener('click', () => selectStation(fav));
-        container.appendChild(chip);
-      }
       if (cardContainer) {
         const card = document.createElement('button');
         card.className = 'favorite-card';
@@ -114,10 +160,11 @@ const App = (() => {
       }
     });
 
+    // Das Favoriten-Menü ist ein eigenes Tab-Panel (siehe activateTab) - hier
+    // wird nur noch der Inhalt darin gesteuert: Hinweistext, wenn leer,
+    // ansonsten die Karten.
     const empty = document.getElementById('favorites-empty-hint');
     if (empty) empty.hidden = favorites.length > 0;
-    const home = document.getElementById('favorites-home');
-    if (home) home.hidden = favorites.length === 0;
 
     updateNotifyToggleVisibility(favorites.length > 0);
 
@@ -333,6 +380,27 @@ const App = (() => {
     const input = document.getElementById('station-search');
     const results = document.getElementById('search-results');
 
+    // Leeres Suchfeld antippen: zuletzt gesuchte Haltestellen als Vorschläge
+    // zeigen, statt dass man erst tippen muss, um überhaupt etwas zu sehen.
+    function showRecentSuggestions() {
+      const recents = loadRecentSearches();
+      if (!recents.length) {
+        results.hidden = true;
+        results.innerHTML = '';
+        return;
+      }
+      results.innerHTML = '<li class="search-result-heading">Zuletzt gesucht</li>';
+      renderSearchResults(results, recents, (station) => {
+        selectStation(station);
+        input.value = '';
+        results.hidden = true;
+      }, { append: true });
+    }
+
+    input.addEventListener('focus', () => {
+      if (input.value.trim().length < 2) showRecentSuggestions();
+    });
+
     input.addEventListener('input', () => {
       const clear = document.getElementById('search-clear');
       if (clear) clear.hidden = input.value.length === 0;
@@ -340,8 +408,7 @@ const App = (() => {
       const query = input.value.trim();
 
       if (query.length < 2) {
-        results.hidden = true;
-        results.innerHTML = '';
+        showRecentSuggestions();
         return;
       }
 
@@ -378,8 +445,8 @@ const App = (() => {
     return '🚏'; // VBB-Haltestelle (U/S/Tram/Bus)
   }
 
-  function renderSearchResults(container, locations, onSelect) {
-    container.innerHTML = '';
+  function renderSearchResults(container, locations, onSelect, { append = false } = {}) {
+    if (!append) container.innerHTML = '';
 
     if (locations.length === 0) {
       container.innerHTML = '<li class="search-result search-result--empty">Keine Treffer</li>';
@@ -410,6 +477,14 @@ const App = (() => {
     document.getElementById('departures-view').hidden = false;
     updateFavoriteButton();
 
+    // Störungsanzeige der zuvor gewählten Haltestelle sofort verstecken,
+    // damit nicht kurz die alten Störungen der letzten Station aufblitzen,
+    // bevor die neuen Abfahrten geladen sind.
+    const disruptionEl = document.getElementById('station-disruption');
+    if (disruptionEl) { disruptionEl.hidden = true; disruptionEl.innerHTML = ''; }
+    const elevatorEl = document.getElementById('elevator-status');
+    if (elevatorEl) { elevatorEl.hidden = true; elevatorEl.innerHTML = ''; }
+
     // Der Modefilter (Verkehrsmittel S/U/Tram/Bus/...) gilt nur für VBB-
     // Haltestellen - die bundesweite DB-Anbindung unterstützt keine Filterung.
     const modeFilterEl = document.getElementById('departures-mode-filter');
@@ -424,14 +499,58 @@ const App = (() => {
     const board = document.getElementById('departure-board');
 
     try {
-      const departures = currentStop.source === 'db'
-        ? (await API.getDbDepartures(currentStop.id)).departures
-        : (await API.getDepartures(currentStop.id, {
+      const data = currentStop.source === 'db'
+        ? await API.getDbDepartures(currentStop.id)
+        : await API.getDepartures(currentStop.id, {
             modes: departuresModeFilter ? departuresModeFilter.getModesParam() : null,
-          })).departures;
-      renderDepartureBoard(departures);
+          });
+      renderDepartureBoard(data.departures);
+      renderStationDisruptions(data.disruptions);
     } catch (err) {
       board.innerHTML = `<div class="board-error">⚠ ${err.message}</div>`;
+    }
+  }
+
+  // Zeigt echte Störungsmeldungen (Bauarbeiten, Ausfälle, Umleitungen) an, die
+  // auf einer der aktuell angezeigten Abfahrten der gewählten Haltestelle
+  // liegen - direkt unterhalb der Abfahrtstafel, damit man sie nicht übersieht.
+  // Aufzugsmeldungen sind eine Untermenge der allgemeinen Störungen (HAFAS
+  // liefert sie als ganz normale "warning"-Remarks) - werden aber separat und
+  // ruhiger dargestellt, weil es sich um eine Zugänglichkeits-Info handelt und
+  // nicht zwangsläufig um eine Störung der eigenen Fahrt.
+  const ELEVATOR_PATTERN = /aufzug|fahrstuhl|aufzüge/i;
+
+  function renderStationDisruptions(disruptions) {
+    const disruptionEl = document.getElementById('station-disruption');
+    const elevatorEl = document.getElementById('elevator-status');
+    if (!disruptionEl && !elevatorEl) return;
+
+    const all = disruptions || [];
+    const elevatorItems = all.filter((d) => ELEVATOR_PATTERN.test(`${d.summary || ''} ${d.text || ''}`));
+    const otherItems = all.filter((d) => !elevatorItems.includes(d));
+
+    if (elevatorEl) {
+      if (elevatorItems.length === 0) {
+        elevatorEl.hidden = true;
+        elevatorEl.innerHTML = '';
+      } else {
+        elevatorEl.hidden = false;
+        elevatorEl.innerHTML = elevatorItems
+          .map((d) => `<div class="elevator-status__item">♿ <strong>${escapeHtml(d.summary || 'Aufzugsstatus')}</strong>${d.text ? `<br>${linkifyRemarkText(d.text)}` : ''}</div>`)
+          .join('');
+      }
+    }
+
+    if (disruptionEl) {
+      if (otherItems.length === 0) {
+        disruptionEl.hidden = true;
+        disruptionEl.innerHTML = '';
+      } else {
+        disruptionEl.hidden = false;
+        disruptionEl.innerHTML = otherItems
+          .map((d) => `<div class="station-disruption__item">⚠ <strong>${escapeHtml(d.summary || 'Störung')}</strong>${d.text ? `<br>${linkifyRemarkText(d.text)}` : ''}</div>`)
+          .join('');
+      }
     }
   }
 
@@ -530,7 +649,34 @@ const App = (() => {
 
     SplitFlap.render(lineCell, (dep.line || '?').toUpperCase());
     SplitFlap.render(row.querySelector('[data-field="direction"]'), (dep.direction || '').toUpperCase());
-    SplitFlap.render(row.querySelector('[data-field="platform"]'), (dep.platform || '-').toUpperCase());
+
+    // Gleiswechsel deutlich hervorheben, statt die neue Gleisnummer einfach
+    // kommentarlos anzuzeigen - genau das übersieht man sonst leicht, wenn
+    // man aus Gewohnheit zum gewohnten Gleis läuft.
+    const platformCell = row.querySelector('[data-field="platform"]');
+    const hasPlatformChange = !dep.cancelled && dep.plannedPlatform && dep.platform && dep.platform !== dep.plannedPlatform;
+
+    if (hasPlatformChange) {
+      const newPlatform = String(dep.platform).toUpperCase();
+      const plannedPlatform = String(dep.plannedPlatform).toUpperCase();
+      if (platformCell.dataset.changedTo !== newPlatform || platformCell.dataset.changedFrom !== plannedPlatform) {
+        platformCell.dataset.changedTo = newPlatform;
+        platformCell.dataset.changedFrom = plannedPlatform;
+        platformCell.classList.add('flap-cell--platform-changed');
+        platformCell.innerHTML = `
+          <span class="platform-changed-flag">GLEIS ${escapeHtml(newPlatform)}</span>
+          <span class="platform-changed-original">statt ${escapeHtml(plannedPlatform)}</span>
+        `;
+      }
+    } else {
+      if (platformCell.classList.contains('flap-cell--platform-changed')) {
+        delete platformCell.dataset.changedTo;
+        delete platformCell.dataset.changedFrom;
+        platformCell.classList.remove('flap-cell--platform-changed');
+        platformCell.innerHTML = '';
+      }
+      SplitFlap.render(platformCell, (dep.platform || '-').toUpperCase());
+    }
 
     const timeCell = row.querySelector('[data-field="time"]');
     if (dep.cancelled) {
@@ -686,7 +832,7 @@ const App = (() => {
       const stops = d.affectedStops.length ? ` · nahe ${d.affectedStops.join(', ')}` : '';
       card.innerHTML = `
         <div class="remark-card__summary">⚠ ${escapeHtml(d.summary || 'Hinweis')}</div>
-        <div class="remark-card__text">${escapeHtml(d.text || '')}</div>
+        <div class="remark-card__text">${linkifyRemarkText(d.text || '')}</div>
         <div class="remark-card__meta">${escapeHtml(lines)}${escapeHtml(stops)}</div>
       `;
       container.appendChild(card);
@@ -753,9 +899,9 @@ const App = (() => {
       const card = document.createElement('div');
       card.className = 'remark-card';
       card.innerHTML = `
-        <div class="remark-card__summary">⚠ ${r.summary || 'Hinweis'}</div>
-        <div class="remark-card__text">${r.text || ''}</div>
-        <div class="remark-card__meta">${r.company || ''}</div>
+        <div class="remark-card__summary">⚠ ${escapeHtml(r.summary || 'Hinweis')}</div>
+        <div class="remark-card__text">${linkifyRemarkText(r.text || '')}</div>
+        <div class="remark-card__meta">${escapeHtml(r.company || '')}</div>
       `;
       container.appendChild(card);
     });
@@ -764,6 +910,26 @@ const App = (() => {
   function initJourneyPlanner() {
     setupJourneyInput('journey-from', (loc) => (journeyFrom = loc));
     setupJourneyInput('journey-to', (loc) => (journeyTo = loc));
+
+    // Zuletzt gewählten Umstiegszeit-Puffer wiederherstellen, damit die
+    // Einstellung nicht bei jedem Besuch neu gesetzt werden muss.
+    const transferSlackSelect = document.getElementById('journey-transfer-slack');
+    if (transferSlackSelect) {
+      const saved = localStorage.getItem(TRANSFER_SLACK_KEY);
+      if (saved !== null) transferSlackSelect.value = saved;
+      transferSlackSelect.addEventListener('change', () => {
+        localStorage.setItem(TRANSFER_SLACK_KEY, transferSlackSelect.value);
+      });
+    }
+
+    // Ebenso für "nur rollstuhlgerechte Verbindungen".
+    const wheelchairToggle = document.getElementById('journey-wheelchair');
+    if (wheelchairToggle) {
+      wheelchairToggle.checked = localStorage.getItem(WHEELCHAIR_KEY) === 'true';
+      wheelchairToggle.addEventListener('change', () => {
+        localStorage.setItem(WHEELCHAIR_KEY, wheelchairToggle.checked ? 'true' : 'false');
+      });
+    }
 
     document.getElementById('journey-use-location').addEventListener('click', async () => {
       const input = document.getElementById('journey-from');
@@ -780,47 +946,163 @@ const App = (() => {
 
     document.querySelectorAll('.when-choice').forEach((button) => {
       button.addEventListener('click', () => {
-        document.querySelectorAll('.when-choice').forEach((item) => item.classList.remove('is-active'));
-        button.classList.add('is-active');
-        const mode = button.dataset.when;
-        journeyArrivalMode = mode === 'arrival';
-        const when = document.getElementById('journey-when');
-        when.hidden = mode === 'now';
-        if (mode !== 'now' && !when.value) {
-          const d = new Date(Date.now() + 10 * 60000);
-          d.setSeconds(0, 0);
-          when.value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0,16);
-        }
+        setWhenChoice(button.dataset.when);
       });
     });
 
-    document.getElementById('journey-submit').addEventListener('click', async () => {
-      const resultsEl = document.getElementById('journey-results');
+    document.getElementById('journey-submit').addEventListener('click', () => runJourneySearch());
 
-      if (!journeyFrom || !journeyTo) {
-        resultsEl.innerHTML = '<div class="board-error">Bitte Start und Ziel aus der Liste auswählen.</div>';
-        return;
+    const shareBtn = document.getElementById('journey-share-btn');
+    if (shareBtn) shareBtn.addEventListener('click', shareCurrentJourney);
+  }
+
+  // Setzt "Jetzt/Abfahrt um/Ankunft um" programmatisch (Klick-Handler UND
+  // Wiederherstellung eines geteilten Links nutzen dieselbe Logik).
+  function setWhenChoice(mode, whenValue) {
+    document.querySelectorAll('.when-choice').forEach((item) => item.classList.toggle('is-active', item.dataset.when === mode));
+    journeyArrivalMode = mode === 'arrival';
+    const when = document.getElementById('journey-when');
+    when.hidden = mode === 'now';
+    if (mode !== 'now') {
+      if (whenValue) {
+        when.value = whenValue;
+      } else if (!when.value) {
+        const d = new Date(Date.now() + 10 * 60000);
+        d.setSeconds(0, 0);
+        when.value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
       }
+    }
+  }
 
-      resultsEl.innerHTML = '<div class="board-empty">Suche Verbindungen…</div>';
+  async function runJourneySearch() {
+    const resultsEl = document.getElementById('journey-results');
+    const shareRow = document.getElementById('journey-share-row');
 
-      const whenInput = document.getElementById('journey-when').value;
-      const params = {
-        from: journeyFrom,
-        to: journeyTo,
-        when: whenInput || undefined,
-        arrival: journeyArrivalMode,
-        results: 5,
-      };
-      lastJourneyParams = params;
+    if (!journeyFrom || !journeyTo) {
+      resultsEl.innerHTML = '<div class="board-error">Bitte Start und Ziel aus der Liste auswählen.</div>';
+      return;
+    }
 
-      try {
-        const { journeys } = await API.getJourneys(params);
-        renderJourneys(journeys, resultsEl);
-      } catch (err) {
-        resultsEl.innerHTML = `<div class="board-error">⚠ ${err.message}</div>`;
-      }
+    resultsEl.innerHTML = '<div class="board-empty">Suche Verbindungen…</div>';
+    if (shareRow) shareRow.hidden = true;
+
+    const whenInput = document.getElementById('journey-when').value;
+    const transferSlackSelect = document.getElementById('journey-transfer-slack');
+    const wheelchairToggle = document.getElementById('journey-wheelchair');
+    const params = {
+      from: journeyFrom,
+      to: journeyTo,
+      when: whenInput || undefined,
+      arrival: journeyArrivalMode,
+      results: 5,
+      transferSlack: transferSlackSelect && transferSlackSelect.value !== '' ? transferSlackSelect.value : undefined,
+      wheelchair: wheelchairToggle ? wheelchairToggle.checked : false,
+    };
+    lastJourneyParams = params;
+
+    try {
+      const { journeys } = await API.getJourneys(params);
+      renderJourneys(journeys, resultsEl);
+      if (shareRow) shareRow.hidden = false;
+    } catch (err) {
+      resultsEl.innerHTML = `<div class="board-error">⚠ ${err.message}</div>`;
+    }
+  }
+
+  // ---------- Route teilen ----------
+  //
+  // Teilt nicht eine einzelne, schnell veraltende Verbindung, sondern die
+  // SUCHE selbst (Start, Ziel, Zeit, Optionen) - wer den Link öffnet, bekommt
+  // dieselbe Suche mit aktuellen Echtzeitdaten statt einer eingefrorenen,
+  // möglicherweise längst überholten Verbindung.
+  function buildJourneyShareUrl() {
+    if (!journeyFrom || !journeyTo) return null;
+
+    // "Mein Standort" wäre für den Empfänger irreführend (es ist ein
+    // eingefrorener Koordinatenpunkt, nicht dessen eigener Standort) - im
+    // geteilten Link daher neutral benennen.
+    const fromName = journeyFrom.name === 'Mein Standort' ? 'Startpunkt' : journeyFrom.name;
+    const toName = journeyTo.name === 'Mein Standort' ? 'Startpunkt' : journeyTo.name;
+
+    const whenInput = document.getElementById('journey-when').value;
+    const transferSlackSelect = document.getElementById('journey-transfer-slack');
+    const wheelchairToggle = document.getElementById('journey-wheelchair');
+
+    const params = new URLSearchParams({
+      route: '1',
+      fromLat: journeyFrom.lat,
+      fromLon: journeyFrom.lon,
+      fromName: fromName || 'Start',
+      toLat: journeyTo.lat,
+      toLon: journeyTo.lon,
+      toName: toName || 'Ziel',
+      arrival: journeyArrivalMode ? '1' : '0',
     });
+    if (whenInput) params.set('when', whenInput);
+    if (transferSlackSelect && transferSlackSelect.value !== '') params.set('transferSlack', transferSlackSelect.value);
+    if (wheelchairToggle && wheelchairToggle.checked) params.set('wheelchair', '1');
+
+    return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+  }
+
+  async function shareCurrentJourney() {
+    const url = buildJourneyShareUrl();
+    if (!url) return;
+
+    const shareData = {
+      title: 'ÖPNV Navi - Verbindung',
+      text: `${journeyFrom.name} → ${journeyTo.name}`,
+      url,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        // Nutzer hat den Teilen-Dialog abgebrochen - kein Fehler, kein Toast.
+        if (err.name !== 'AbortError') console.error('Teilen-Fehler:', err.message);
+      }
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast('Link kopiert!', 'info');
+    } catch (err) {
+      console.error('Clipboard-Fehler:', err.message);
+      window.prompt('Link kopieren:', url);
+    }
+  }
+
+  // Öffnet beim Start automatisch einen geteilten Link (?route=1&...), falls
+  // vorhanden - inklusive derselben Suche, die der Absender eingestellt hatte.
+  function restoreJourneyFromShareLink() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('route') !== '1') return;
+
+    const fromLat = parseFloat(params.get('fromLat'));
+    const fromLon = parseFloat(params.get('fromLon'));
+    const toLat = parseFloat(params.get('toLat'));
+    const toLon = parseFloat(params.get('toLon'));
+    if ([fromLat, fromLon, toLat, toLon].some((v) => Number.isNaN(v))) return;
+
+    journeyFrom = { lat: fromLat, lon: fromLon, name: params.get('fromName') || 'Start' };
+    journeyTo = { lat: toLat, lon: toLon, name: params.get('toName') || 'Ziel' };
+    document.getElementById('journey-from').value = journeyFrom.name;
+    document.getElementById('journey-to').value = journeyTo.name;
+
+    const whenValue = params.get('when') || '';
+    setWhenChoice(params.get('arrival') === '1' ? 'arrival' : (whenValue ? 'departure' : 'now'), whenValue);
+
+    const transferSlackParam = params.get('transferSlack');
+    const transferSlackSelect = document.getElementById('journey-transfer-slack');
+    if (transferSlackSelect && transferSlackParam) transferSlackSelect.value = transferSlackParam;
+
+    const wheelchairToggle = document.getElementById('journey-wheelchair');
+    if (wheelchairToggle) wheelchairToggle.checked = params.get('wheelchair') === '1';
+
+    activateTab('journey');
+    runJourneySearch();
   }
 
   function setupJourneyInput(inputId, onSelect) {
@@ -985,6 +1267,7 @@ const App = (() => {
     initNearby();
     initNearbyDisruptions();
     initNotifications();
+    TripAlarm.load();
     renderFavoriteChips();
     renderRecentSearches();
 
@@ -1011,6 +1294,7 @@ const App = (() => {
     });
 
     restoreLastStop();
+    restoreJourneyFromShareLink();
   }
 
   return { init };

@@ -28,6 +28,8 @@
       <button id="search-clear" class="search-clear" type="button" aria-label="Suche leeren" hidden>×</button>
       <ul id="search-results" class="search-results" hidden></ul>
     </div>
+
+    <button id="header-favorites-btn" class="header-icon-btn" data-tab="favorites" type="button" title="Favoriten" aria-label="Favoriten">★</button>
   </header>
 
   <nav class="tab-nav" aria-label="Hauptnavigation">
@@ -55,14 +57,6 @@
         </div>
       </div>
 
-      <div id="favorites-home" class="home-section" hidden>
-        <div class="section-heading">
-          <div><span class="section-heading__eyebrow">SCHNELLZUGRIFF</span><h2>Meine Haltestellen</h2></div>
-          <button id="notify-toggle" class="text-button" type="button" hidden>🔔 Störungsbenachrichtigungen aktivieren</button>
-        </div>
-        <div id="favorite-cards" class="favorite-cards"></div>
-      </div>
-
       <div id="nearby-home" class="home-section" hidden>
         <div class="section-heading">
           <div><span class="section-heading__eyebrow">OPTIONAL</span><h2>Haltestellen in der Nähe</h2></div>
@@ -81,9 +75,10 @@
         </div>
         <div id="board-status" class="board-status" aria-live="polite"><span class="status-dot"></span> Aktualisierung alle 30 Sekunden</div>
         <div id="departures-mode-filter" class="mode-filter"></div>
-        <div id="station-disruption" class="station-disruption" hidden></div>
-        <div id="board-empty-state" class="board-empty-state">Suche oben eine Haltestelle, um Live-Abfahrten zu sehen.</div>
         <div id="departure-board" class="departure-board" role="table" aria-label="Abfahrtstafel"></div>
+        <div id="board-empty-state" class="board-empty-state">Suche oben eine Haltestelle, um Live-Abfahrten zu sehen.</div>
+        <div id="elevator-status" class="elevator-status" hidden></div>
+        <div id="station-disruption" class="station-disruption" hidden></div>
       </div>
     </section>
 
@@ -127,10 +122,28 @@
         <button class="when-choice" data-when="arrival" type="button">Ankunft um</button>
         <input type="datetime-local" id="journey-when" class="journey-datetime" hidden />
       </div>
+      <label class="wheelchair-toggle">
+        <input type="checkbox" id="journey-wheelchair" />
+        <span>♿ Nur rollstuhlgerechte Verbindungen</span>
+      </label>
       <div class="journey-options-row">
+        <div class="transfer-slack-field">
+          <label for="journey-transfer-slack">Umstiegszeit-Puffer</label>
+          <select id="journey-transfer-slack">
+            <option value="">Standard</option>
+            <option value="0">0 min (knapp)</option>
+            <option value="3">3 min</option>
+            <option value="5">5 min</option>
+            <option value="10">10 min</option>
+            <option value="15">15 min (sicher)</option>
+          </select>
+        </div>
         <button id="journey-submit" class="journey-submit" type="button">Verbindungen suchen <span>→</span></button>
       </div>
       <p class="journey-source-note">🛰 Routenplanung über unsere selbst gehostete, offene Instanz (VBB-Region)</p>
+      <div id="journey-share-row" class="journey-share-row" hidden>
+        <button id="journey-share-btn" class="text-button" type="button">🔗 Route teilen</button>
+      </div>
       <div id="journey-results" class="journey-results"></div>
     </section>
 
@@ -138,6 +151,20 @@
       <div class="panel-heading"><div><span class="section-heading__eyebrow">STANDORT</span><h1>In der Nähe</h1><p>Finde Haltestellen rund um deinen aktuellen Standort.</p></div></div>
       <button id="nearby-locate" class="location-btn location-btn--wide">📍 Meinen Standort verwenden</button>
       <div id="nearby-list" class="nearby-list"><div class="board-empty-state">Nutze deinen Standort, um Haltestellen in deiner Nähe zu finden.</div></div>
+    </section>
+
+    <section class="tab-panel" data-tab-panel="favorites" hidden>
+      <div class="panel-heading">
+        <div><span class="section-heading__eyebrow">SCHNELLZUGRIFF</span><h1>Meine Haltestellen</h1><p>Deine gespeicherten Haltestellen mit Live-Abfahrten und Störungshinweisen.</p></div>
+      </div>
+      <div id="favorites-home" class="home-section">
+        <div class="section-heading">
+          <div></div>
+          <button id="notify-toggle" class="text-button" type="button" hidden>🔔 Störungsbenachrichtigungen aktivieren</button>
+        </div>
+        <p id="favorites-empty-hint" class="favorites-empty-hint">Noch keine Favoriten - tippe bei einer Haltestelle auf ☆, um sie hier anzupinnen.</p>
+        <div id="favorite-cards" class="favorite-cards"></div>
+      </div>
     </section>
 
     <section class="tab-panel" data-tab-panel="disruptions" hidden>
@@ -164,6 +191,7 @@
     <section class="tab-panel" data-tab-panel="more" hidden>
       <div class="panel-heading"><div><span class="section-heading__eyebrow">WEITERE FUNKTIONEN</span><h1>Mehr</h1><p>Alles, was nicht bei jeder Fahrt gebraucht wird.</p></div></div>
       <div class="more-grid">
+        <button class="more-card" data-open-tab="favorites" type="button"><span>★</span><strong>Favoriten</strong><small>Deine gespeicherten Haltestellen</small></button>
         <button class="more-card" data-open-tab="nearby" type="button"><span>📍</span><strong>In der Nähe</strong><small>Haltestellen in deiner Umgebung</small></button>
         <button class="more-card" data-open-tab="disruptions" type="button"><span>⚠</span><strong>Störungen</strong><small>Ortsbezogen &amp; netzweit</small></button>
         <button class="more-card" data-open-tab="fares" type="button"><span>🎫</span><strong>Tickets</strong><small>Preise &amp; wo kaufen</small></button>
@@ -190,6 +218,7 @@
   <script src="js/splitflap.js"></script>
   <script src="js/modefilter.js"></script>
   <script src="js/livemap.js"></script>
+  <script src="js/tripalarm.js"></script>
   <script src="js/tripmodal.js"></script>
   <script src="js/app.js"></script>
   <div id="toast-container" class="toast-container" aria-live="polite"></div>

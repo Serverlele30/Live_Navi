@@ -98,7 +98,7 @@ const API = (() => {
      * `from`/`to` brauchen nur noch { lat, lon, name } - egal ob Haltestelle,
      * Adresse, POI oder GPS-Standort, alle liefern das bereits mit.
      */
-    getJourneys({ from, to, when, arrival, polylines, results = 5 }) {
+    getJourneys({ from, to, when, arrival, polylines, results = 5, transferSlack, wheelchair }) {
       return request(
         `/otp/journeys?${qs({
           fromLat: from.lat,
@@ -109,6 +109,8 @@ const API = (() => {
           arrival: arrival ? 'true' : undefined,
           polylines: polylines ? 'true' : undefined,
           results,
+          transferSlack,
+          wheelchair: wheelchair ? 'true' : undefined,
         })}`,
       );
     },

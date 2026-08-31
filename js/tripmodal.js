@@ -1,10 +1,21 @@
 // Modal, das beim Klick auf eine Abfahrtszeile oder einen Verbindungsabschnitt
 // geöffnet wird: zeigt Linie, Richtung, eine kleine Karte mit dem Streckenverlauf
-// und alle Zwischenhalte mit Zeiten/Verspätungen.
+// und alle Zwischenhalte mit Zeiten/Verspätungen. Über die Glocken-Buttons an
+// den kommenden Halten kann hier außerdem ein Fahrtalarm gesetzt werden
+// (siehe tripalarm.js).
 
 const TripModal = (() => {
+  const ALARM_OFFSET_KEY = 'oepnv-navi:db-alarm-offset';
+
   let backdrop = null;
   let miniMap = null;
+
+  // Zustand der aktuell geöffneten Fahrt, damit wir nach dem Setzen/Entfernen
+  // eines Alarms den Haltestellen-Teil neu rendern können, ohne die Fahrt
+  // erneut vom Server zu laden.
+  let currentTripId = null;
+  let currentTrip = null;
+  let currentIndex = -1;
 
   function ensureBackdrop() {
     if (backdrop) return backdrop;
@@ -37,6 +48,16 @@ const TripModal = (() => {
       if (e.key === 'Escape' && !backdrop.hidden) close();
     });
 
+    // Delegierter Klick-Handler für die Alarm-Glocken an den Haltestellen -
+    // einmalig registriert, damit er bei jedem open() weiter funktioniert,
+    // ohne mehrfach angehängt zu werden.
+    backdrop.querySelector('#trip-modal-body').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-alarm-index]');
+      if (!btn || !currentTrip) return;
+      const index = parseInt(btn.dataset.alarmIndex, 10);
+      toggleAlarm(index);
+    });
+
     return backdrop;
   }
 
@@ -54,10 +75,41 @@ const TripModal = (() => {
     return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   }
 
-  function renderStopover(s, isCurrentOrNext) {
+  function getAlarmOffset() {
+    return parseInt(localStorage.getItem(ALARM_OFFSET_KEY), 10) || 1;
+  }
+
+  function setAlarmOffset(value) {
+    localStorage.setItem(ALARM_OFFSET_KEY, String(value));
+  }
+
+  function toggleAlarm(index) {
+    if (!currentTrip || !currentTripId) return;
+
+    if (TripAlarm.isActiveFor(currentTripId, index)) {
+      TripAlarm.clear();
+    } else {
+      const select = document.getElementById('trip-alarm-offset-select');
+      const stopsBefore = select ? parseInt(select.value, 10) : getAlarmOffset();
+      setAlarmOffset(stopsBefore);
+      TripAlarm.set({
+        tripId: currentTripId,
+        line: currentTrip.line,
+        color: currentTrip.color,
+        textColor: currentTrip.textColor,
+        targetIndex: index,
+        targetName: (currentTrip.stopovers[index] || {}).name || '',
+        stopsBefore,
+      });
+    }
+    renderStopoversBody();
+  }
+
+  function renderStopover(s, index) {
     const time = s.departure || s.arrival || s.plannedDeparture || s.plannedArrival;
     const plannedTime = s.plannedDeparture || s.plannedArrival;
     const delay = s.departureDelay ?? s.arrivalDelay;
+    const isCurrentOrNext = index === currentIndex;
 
     let timeHtml;
     if (s.cancelled) {
@@ -68,20 +120,68 @@ const TripModal = (() => {
       timeHtml = `<span class="trip-stopover__time">${formatTime(time) || '–'}</span>`;
     }
 
+    // Ein Fahrtalarm ergibt nur für noch bevorstehende, nicht ausgefallene
+    // Halte Sinn - nicht für bereits vergangene.
+    const canAlarm = !s.cancelled && index >= currentIndex;
+    const isActiveAlarm = canAlarm && TripAlarm.isActiveFor(currentTripId, index);
+    const alarmHtml = canAlarm
+      ? `<button class="trip-stopover__alarm-btn ${isActiveAlarm ? 'is-active' : ''}" data-alarm-index="${index}" type="button" title="${isActiveAlarm ? 'Fahrtalarm entfernen' : 'Fahrtalarm für diese Haltestelle setzen'}">${isActiveAlarm ? '🔔' : '🔕'}</button>`
+      : '';
+
     return `
       <div class="trip-stopover ${isCurrentOrNext ? 'trip-stopover--current' : ''} ${s.cancelled ? 'trip-stopover--cancelled' : ''}">
         <div class="trip-stopover__row">
           <span class="trip-stopover__name">${s.name || ''}</span>
           ${timeHtml}
+          ${alarmHtml}
         </div>
       </div>
     `;
+  }
+
+  function renderStopoversBody() {
+    const body = document.getElementById('trip-modal-body');
+    if (!body || !currentTrip) return;
+    const stopovers = currentTrip.stopovers || [];
+
+    if (!stopovers.length) {
+      body.innerHTML = '<div class="trip-modal__loading">Keine Zwischenhalte verfügbar.</div>';
+      return;
+    }
+
+    const hasUpcoming = stopovers.some((s, i) => !s.cancelled && i >= currentIndex);
+    const offsetSelectHtml = hasUpcoming
+      ? `
+        <div class="trip-alarm-offset-row">
+          <span>🔔 Fahrtalarm:</span>
+          <select id="trip-alarm-offset-select">
+            <option value="0">bei Ankunft</option>
+            <option value="1">1 Station vorher</option>
+            <option value="2">2 Stationen vorher</option>
+            <option value="3">3 Stationen vorher</option>
+          </select>
+          <small>Glocke an der Zielhaltestelle antippen</small>
+        </div>
+      `
+      : '';
+
+    body.innerHTML = `
+      ${offsetSelectHtml}
+      <div class="trip-stopovers">
+        ${stopovers.map((s, i) => renderStopover(s, i)).join('')}
+      </div>
+    `;
+
+    const select = document.getElementById('trip-alarm-offset-select');
+    if (select) select.value = String(getAlarmOffset());
   }
 
   async function open(tripId) {
     if (!tripId) return;
     const el = ensureBackdrop();
     el.hidden = false;
+    currentTripId = tripId;
+    currentTrip = null;
 
     document.getElementById('trip-modal-line').textContent = '…';
     document.getElementById('trip-modal-line').style.background = '#8E99A6';
@@ -96,6 +196,8 @@ const TripModal = (() => {
       document.getElementById('trip-modal-body').innerHTML = `<div class="trip-modal__error">⚠ ${err.message}</div>`;
       return;
     }
+
+    currentTrip = trip;
 
     const lineEl = document.getElementById('trip-modal-line');
     lineEl.textContent = trip.line || '?';
@@ -130,21 +232,15 @@ const TripModal = (() => {
 
     const stopovers = trip.stopovers || [];
     const now = Date.now();
-    let currentIndex = stopovers.findIndex((s) => {
+    currentIndex = stopovers.findIndex((s) => {
       const t = s.departure || s.plannedDeparture;
       return t && new Date(t).getTime() >= now;
     });
     if (currentIndex === -1) currentIndex = stopovers.length - 1;
 
-    const bodyHtml = `
-      <div class="trip-stopovers">
-        ${stopovers.map((s, i) => renderStopover(s, i === currentIndex)).join('')}
-      </div>
-    `;
-    document.getElementById('trip-modal-body').innerHTML = stopovers.length
-      ? bodyHtml
-      : '<div class="trip-modal__loading">Keine Zwischenhalte verfügbar.</div>';
+    renderStopoversBody();
   }
 
   return { open, close };
 })();
+

@@ -23,6 +23,7 @@ const LiveMap = (() => {
   let isolatedMarker = null; // persistenter Marker im Isolations-Modus, wird nur aktualisiert statt neu erzeugt
   let isolatedVehicleMeta = null; // { line, color, textColor } für die Banner-Anzeige
   let getModesParam = () => null; // wird von außen (ModeFilter) gesetzt
+  let resizeScheduled = false;
 
   function init() {
     if (map) return;
@@ -41,6 +42,53 @@ const LiveMap = (() => {
     map.on('moveend', () => {
       if (mode === 'radar') refreshRadar();
     });
+
+    // Die Karte soll die tatsächlich verfügbare Bildschirmhöhe ausfüllen -
+    // unabhängig von Gerät/Displaygröße, Adressleisten-Ein-/Ausblenden auf
+    // Mobilgeräten oder Bildschirmdrehung. Statt die Höhe über CSS mit
+    // geschätzten Pixelwerten zu berechnen (die bei jedem neuen Gerät wieder
+    // falsch wären), messen wir hier direkt den tatsächlich freien Platz und
+    // setzen die Höhe daraus - das funktioniert für jede Displaygröße gleich
+    // gut (Mobile First: der Startwert in CSS ist bereits mobilfreundlich,
+    // hier wird er nur noch exakt nachjustiert).
+    resizeToViewport();
+    window.addEventListener('resize', scheduleResize);
+    window.addEventListener('orientationchange', scheduleResize);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', scheduleResize);
+    }
+  }
+
+  function scheduleResize() {
+    if (resizeScheduled) return;
+    resizeScheduled = true;
+    requestAnimationFrame(() => {
+      resizeScheduled = false;
+      resizeToViewport();
+    });
+  }
+
+  function resizeToViewport() {
+    const el = document.getElementById('live-map');
+    if (!el) return;
+
+    const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const top = el.getBoundingClientRect().top;
+
+    // Die feste untere Mobil-Navigationsleiste überlappt den Inhalt
+    // (position: fixed) - ihre Höhe muss von der verfügbaren Fläche
+    // abgezogen werden, sofern sie gerade sichtbar ist (auf Desktop-
+    // Breiten ist sie per CSS ausgeblendet).
+    const mobileNav = document.querySelector('.mobile-nav');
+    const mobileNavHeight = mobileNav && getComputedStyle(mobileNav).display !== 'none'
+      ? mobileNav.getBoundingClientRect().height
+      : 0;
+
+    const bottomSafety = 12; // etwas Luft, u.a. für mobile Adressleisten am unteren Rand
+    const available = viewportHeight - top - mobileNavHeight - bottomSafety;
+
+    el.style.height = `${Math.max(280, Math.round(available))}px`;
+    if (map) map.invalidateSize();
   }
 
   function setModeFilter(fn) {
@@ -106,7 +154,7 @@ const LiveMap = (() => {
     refreshRadar();
     if (radarPollHandle) clearInterval(radarPollHandle);
     radarPollHandle = setInterval(refreshRadar, 15000);
-    setTimeout(() => map && map.invalidateSize(), 150);
+    setTimeout(() => resizeToViewport(), 150);
   }
 
   function stopRadar() {
@@ -279,7 +327,7 @@ const LiveMap = (() => {
     refreshTrip();
     if (tripPollHandle) clearInterval(tripPollHandle);
     tripPollHandle = setInterval(refreshTrip, 10000);
-    setTimeout(() => map && map.invalidateSize(), 150);
+    setTimeout(() => resizeToViewport(), 150);
   }
 
   function stopTracking() {
@@ -327,7 +375,7 @@ const LiveMap = (() => {
   function startPolling() {
     // Rückwärtskompatibler Einstieg: Karten-Tab wurde geöffnet.
     if (mode === 'radar' || mode === 'idle') startRadar();
-    else if (map) setTimeout(() => map.invalidateSize(), 150);
+    else if (map) setTimeout(() => resizeToViewport(), 150);
   }
 
   function stopPolling() {
