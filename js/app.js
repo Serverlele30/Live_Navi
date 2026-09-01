@@ -299,17 +299,43 @@ const App = (() => {
     const container = document.getElementById('toast-container');
     if (!container) return;
 
+    const ICONS = { success: '✓', warning: '⚠', info: 'ℹ' };
+
     const toast = document.createElement('div');
     toast.className = `toast toast--${variant}`;
-    toast.textContent = message;
+    toast.innerHTML = `
+      <span class="toast__icon" aria-hidden="true">${ICONS[variant] || ICONS.info}</span>
+      <span class="toast__message"></span>
+      <button class="toast__close" type="button" aria-label="Schließen">×</button>
+      <span class="toast__progress"></span>
+    `;
+    toast.querySelector('.toast__message').textContent = message;
     container.appendChild(toast);
 
-    requestAnimationFrame(() => toast.classList.add('is-visible'));
+    const AUTO_DISMISS_MS = 6000;
+    let dismissTimer = null;
 
-    setTimeout(() => {
+    function dismiss() {
+      clearTimeout(dismissTimer);
       toast.classList.remove('is-visible');
-      setTimeout(() => toast.remove(), 300);
-    }, 6000);
+      setTimeout(() => toast.remove(), 250);
+    }
+
+    toast.querySelector('.toast__close').addEventListener('click', dismiss);
+
+    requestAnimationFrame(() => {
+      toast.classList.add('is-visible');
+      // Countdown-Leiste per CSS-Transition auf 0 fahren, synchron zur
+      // tatsächlichen Anzeigedauer - zeigt beiläufig, wie viel Zeit bleibt,
+      // ohne dass man aktiv draufschauen muss.
+      const progress = toast.querySelector('.toast__progress');
+      if (progress) {
+        progress.style.transitionDuration = `${AUTO_DISMISS_MS}ms`;
+        requestAnimationFrame(() => { progress.style.transform = 'scaleX(0)'; });
+      }
+    });
+
+    dismissTimer = setTimeout(dismiss, AUTO_DISMISS_MS);
   }
 
   // ---------- Browser-Benachrichtigungen an/aus ----------
@@ -377,6 +403,8 @@ const App = (() => {
     btn.classList.toggle('is-active', active);
   }
 
+  let lastKnownLocation = null; // { lat, lon } - einmal ermittelt, für Autostart & Störungen wiederverwendet
+
   function getUserLocation() {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
@@ -384,7 +412,10 @@ const App = (() => {
         return;
       }
       navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+        (pos) => {
+          lastKnownLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+          resolve(lastKnownLocation);
+        },
         (err) => reject(new Error('Standort konnte nicht ermittelt werden: ' + err.message)),
         { enableHighAccuracy: true, timeout: 10000 },
       );
@@ -658,7 +689,15 @@ const App = (() => {
       } else {
         elevatorEl.hidden = false;
         elevatorEl.innerHTML = elevatorItems
-          .map((d) => `<div class="elevator-status__item">♿ <strong>${escapeHtml(d.summary || 'Aufzugsstatus')}</strong>${d.text ? `<br>${linkifyRemarkText(d.text)}` : ''}</div>`)
+          .map((d) => `
+            <div class="notice-item">
+              <span class="notice-item__icon" aria-hidden="true">♿</span>
+              <div class="notice-item__body">
+                <strong>${escapeHtml(d.summary || 'Aufzugsstatus')}</strong>
+                ${d.text ? `<span class="notice-item__text">${linkifyRemarkText(d.text)}</span>` : ''}
+              </div>
+            </div>
+          `)
           .join('');
       }
     }
@@ -670,7 +709,15 @@ const App = (() => {
       } else {
         disruptionEl.hidden = false;
         disruptionEl.innerHTML = otherItems
-          .map((d) => `<div class="station-disruption__item">⚠ <strong>${escapeHtml(d.summary || 'Störung')}</strong>${d.text ? `<br>${linkifyRemarkText(d.text)}` : ''}</div>`)
+          .map((d) => `
+            <div class="notice-item">
+              <span class="notice-item__icon" aria-hidden="true">⚠</span>
+              <div class="notice-item__body">
+                <strong>${escapeHtml(d.summary || 'Störung')}</strong>
+                ${d.text ? `<span class="notice-item__text">${linkifyRemarkText(d.text)}</span>` : ''}
+              </div>
+            </div>
+          `)
           .join('');
       }
     }
@@ -778,6 +825,52 @@ const App = (() => {
     row.style.setProperty('--line-color', dep.color || '#8E99A6');
 
     SplitFlap.render(lineCell, (dep.line || '?').toUpperCase());
+    // Bei langen Zugbezeichnungen (z.B. "ICE 940") reicht die feste
+    // Spaltenbreite nicht - der Text läuft dann von selbst wie ein Ticker
+    // durch (CSS-Animation), kein manuelles Scrollen nötig. Hier nur messen,
+    // wie weit der Text übersteht, und Distanz/Tempo als CSS-Variablen setzen.
+    // requestAnimationFrame, damit die SplitFlap-Zeichen-Spans sicher schon
+    // im DOM stehen, bevor die Breite gemessen wird.
+    requestAnimationFrame(() => {
+      const visual = lineCell.querySelector('.flap-cell__visual');
+      let overflowPx = 0;
+      if (visual) {
+        // Echte Geometrie statt clientWidth/scrollWidth-Schätzung: clientWidth
+        // schließt das eigene Padding der Badge mit ein, wodurch die zuvor
+        // berechnete Laufweite immer um genau das rechte Padding zu kurz war -
+        // das letzte Zeichen war dadurch nie vollständig sichtbar. Hier wird
+        // stattdessen direkt gemessen, wie weit der rechte Rand des Textes
+        // über den rechten Innenrand (Content-Box, ohne Padding) der Badge hinausragt.
+        const lineRect = lineCell.getBoundingClientRect();
+        const visualRect = visual.getBoundingClientRect();
+        const paddingRight = parseFloat(getComputedStyle(lineCell).paddingRight) || 0;
+        const contentBoxRight = lineRect.right - paddingRight;
+        overflowPx = Math.max(0, visualRect.right - contentBoxRight);
+      }
+      const isScrollable = overflowPx > 1;
+      // Nicht bei jedem 30s-Poll unangetastet neu antriggern, wenn sich an der
+      // Überstands-Länge nichts geändert hat - sonst startet die Animation
+      // immer wieder von vorn und wirkt dadurch unruhiger/hektischer, als sie
+      // eigentlich ist.
+      const previousDistance = lineCell.dataset.marqueeOverflow;
+      const currentDistance = String(Math.round(overflowPx));
+      if (previousDistance === currentDistance) return;
+      lineCell.dataset.marqueeOverflow = currentDistance;
+
+      lineCell.classList.toggle('flap-cell--line--scrollable', isScrollable);
+      if (isScrollable) {
+        // +2px statt einer größeren Zugabe - die Distanz soll das letzte
+        // Zeichen exakt an den Innenrand bringen, nicht noch weiter drüber hinaus.
+        // Bewusst langsam und ruhig: 12px/s als Grundtempo, mindestens 4.5s pro
+        // Durchlauf, damit es wie ein gemächlicher Bahnhofstafel-Ticker wirkt
+        // statt hektisch hin- und herzuschnellen.
+        lineCell.style.setProperty('--marquee-distance', `-${overflowPx + 2}px`);
+        lineCell.style.setProperty('--marquee-duration', `${Math.max(4.5, overflowPx / 12).toFixed(1)}s`);
+      } else {
+        lineCell.style.removeProperty('--marquee-distance');
+        lineCell.style.removeProperty('--marquee-duration');
+      }
+    });
     SplitFlap.render(row.querySelector('[data-field="direction"]'), (dep.direction || '').toUpperCase());
 
     // Gleiswechsel deutlich hervorheben, statt die neue Gleisnummer einfach
@@ -895,6 +988,10 @@ const App = (() => {
 
     if (tabName === 'disruptions' && !remarksLoadedOnce) {
       loadRemarks();
+      // "In deiner Nähe" automatisch mitladen statt auf den manuellen
+      // "Standort verwenden"-Klick zu warten - Störungen sollen immer sowohl
+      // für die Favoriten als auch für den aktuellen Standort da sein.
+      loadNearbyDisruptions();
     }
 
     if (tabName === 'fares' && !faresLoadedOnce) {
@@ -935,19 +1032,8 @@ const App = (() => {
     document.getElementById('nearby-home').hidden = locations.length === 0;
   }
 
-  async function loadNearbyPreview() {
-    const home = document.getElementById('nearby-home');
-    const list = document.getElementById('nearby-home-list');
-    if (!navigator.geolocation || !home || !list) return;
-    list.innerHTML = '<div class="recent-empty">Standort wird ermittelt…</div>';
-    try {
-      const { lat, lon } = await getUserLocation();
-      const { locations } = await API.nearby({ lat, lon, distance: 1000, results: 3 });
-      renderNearbyPreview(locations);
-    } catch (_) {
-      home.hidden = true;
-    }
-  }
+  // (Autostart am Standort - inkl. Vorschau der übrigen nahen Haltestellen -
+  // übernimmt jetzt autonom autoStartFromLocation() beim App-Start.)
 
   function renderNearbyList(locations, container) {
     container.innerHTML = '';
@@ -975,18 +1061,26 @@ const App = (() => {
   function initNearbyDisruptions() {
     const btn = document.getElementById('disruptions-locate');
     if (!btn) return;
-    btn.addEventListener('click', async () => {
-      const container = document.getElementById('nearby-disruptions-list');
-      container.innerHTML = '<div class="board-empty">Standort wird ermittelt…</div>';
-      try {
-        const { lat, lon } = await getUserLocation();
-        container.innerHTML = '<div class="board-empty">Suche Störungen in der Nähe…</div>';
-        const { disruptions } = await API.getNearbyDisruptions({ lat, lon, distance: 1000, stops: 6 });
-        renderNearbyDisruptions(disruptions, container);
-      } catch (err) {
-        container.innerHTML = `<div class="board-error">⚠ ${err.message}</div>`;
-      }
-    });
+    btn.addEventListener('click', () => loadNearbyDisruptions());
+  }
+
+  // Lädt Störungen rund um den aktuellen Standort - wird sowohl vom manuellen
+  // "Standort verwenden"-Button als auch automatisch beim ersten Öffnen des
+  // Störungen-Tabs aufgerufen (siehe activateTab()), damit man dafür nicht
+  // erst extra klicken muss. Nutzt den beim Start bereits ermittelten
+  // Standort weiter, statt ihn ein zweites Mal abzufragen, falls vorhanden.
+  async function loadNearbyDisruptions() {
+    const container = document.getElementById('nearby-disruptions-list');
+    if (!container) return;
+    container.innerHTML = '<div class="board-empty">Standort wird ermittelt…</div>';
+    try {
+      const { lat, lon } = lastKnownLocation || (await getUserLocation());
+      container.innerHTML = '<div class="board-empty">Suche Störungen in der Nähe…</div>';
+      const { disruptions } = await API.getNearbyDisruptions({ lat, lon, distance: 1000, stops: 6 });
+      renderNearbyDisruptions(disruptions, container);
+    } catch (err) {
+      container.innerHTML = `<div class="board-error">⚠ ${err.message}</div>`;
+    }
   }
 
   function renderNearbyDisruptions(disruptions, container) {
@@ -1001,9 +1095,14 @@ const App = (() => {
       const lines = d.affectedLines.length ? `Linie${d.affectedLines.length > 1 ? 'n' : ''} ${d.affectedLines.join(', ')}` : '';
       const stops = d.affectedStops.length ? ` · nahe ${d.affectedStops.join(', ')}` : '';
       card.innerHTML = `
-        <div class="remark-card__summary">⚠ ${escapeHtml(d.summary || 'Hinweis')}</div>
-        <div class="remark-card__text">${linkifyRemarkText(d.text || '')}</div>
-        <div class="remark-card__meta">${escapeHtml(lines)}${escapeHtml(stops)}</div>
+        <div class="notice-item">
+          <span class="notice-item__icon" aria-hidden="true">⚠</span>
+          <div class="notice-item__body">
+            <strong>${escapeHtml(d.summary || 'Hinweis')}</strong>
+            <span class="notice-item__text">${linkifyRemarkText(d.text || '')}</span>
+            <span class="notice-item__meta">${escapeHtml(lines)}${escapeHtml(stops)}</span>
+          </div>
+        </div>
       `;
       container.appendChild(card);
     });
@@ -1069,9 +1168,14 @@ const App = (() => {
       const card = document.createElement('div');
       card.className = 'remark-card';
       card.innerHTML = `
-        <div class="remark-card__summary">⚠ ${escapeHtml(r.summary || 'Hinweis')}</div>
-        <div class="remark-card__text">${linkifyRemarkText(r.text || '')}</div>
-        <div class="remark-card__meta">${escapeHtml(r.company || '')}</div>
+        <div class="notice-item">
+          <span class="notice-item__icon" aria-hidden="true">⚠</span>
+          <div class="notice-item__body">
+            <strong>${escapeHtml(r.summary || 'Hinweis')}</strong>
+            <span class="notice-item__text">${linkifyRemarkText(r.text || '')}</span>
+            <span class="notice-item__meta">${escapeHtml(r.company || '')}</span>
+          </div>
+        </div>
       `;
       container.appendChild(card);
     });
@@ -1445,6 +1549,26 @@ const App = (() => {
     }
   }
 
+  // Startet die App am aktuellen Standort statt an der zuletzt gewählten
+  // Haltestelle: sucht Haltestellen in der Nähe, wählt automatisch die
+  // nächstgelegene aus (Abfahrten erscheinen ohne weiteren Klick) und füllt
+  // nebenbei die "In der Nähe"-Vorschau mit den übrigen Treffern. Klappt das
+  // nicht (Berechtigung verweigert, kein Standort, keine Treffer in der Nähe),
+  // fällt die App auf die zuletzt besuchte Haltestelle zurück statt leer zu bleiben.
+  async function autoStartFromLocation() {
+    try {
+      const { lat, lon } = await getUserLocation();
+      const { locations } = await API.nearby({ lat, lon, distance: 1000, results: 15 });
+      if (!locations.length) throw new Error('Keine Haltestellen in der Nähe gefunden.');
+
+      selectStation(locations[0]);
+      renderNearbyPreview(locations.slice(1));
+    } catch (err) {
+      console.error('Autostart am Standort nicht möglich, nutze letzte Haltestelle:', err.message);
+      restoreLastStop();
+    }
+  }
+
   function init() {
     I18N.init();
     if (window.Push && Push.isSupported()) Push.registerServiceWorker();
@@ -1492,7 +1616,7 @@ const App = (() => {
       if (currentStop) toggleFavorite(currentStop);
     });
 
-    restoreLastStop();
+    autoStartFromLocation();
     restoreJourneyFromShareLink();
   }
 

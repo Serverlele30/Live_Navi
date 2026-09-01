@@ -1,97 +1,87 @@
-# ÖPNV Navi – Backend
+# ÖPNV Navi – Frontend
 
-Backend für die geplante "ÖPNV Navi" iOS-App (Nachfolger der VBB-Status-Web-App).
-Stellt VBB-Echtzeitdaten (Abfahrten, Routenplaner, Live-Map) sowie eigene Features
-(Favoriten, Push-Token-Registrierung) über eine REST-API bereit.
+Vanilla-JS-Webapp für Live-Abfahrten, Routenplanung und eine Live-Karte im
+VBB-Verbund (Berlin/Brandenburg) mit Anbindung an echte DB-Bahnhöfe. Kein
+Build-Schritt, kein Framework – reines HTML/CSS/JS, läuft direkt als
+statische Website.
 
-## 1. Installation
+## Tech-Stack
 
-```bash
-cd oepnv-navi-backend
-npm install
-cp .env.example .env
+- Reines HTML5, CSS3, ES2020+ JavaScript (keine Frameworks, kein Bundler)
+- [Leaflet](https://leafletjs.com/) für die Live-Karte (per CDN eingebunden)
+- Google Fonts: IBM Plex Mono / Sans / Sans Condensed
+- Service Worker für Web-Push-Benachrichtigungen
+
+## Ordnerstruktur
+
+```
+frontend/
+├── index.html          Einzige HTML-Seite (Single Page App über Tabs)
+├── styles.css           Komplettes Stylesheet ("Solari-Anzeigetafel bei Nacht"-Theme)
+├── sw.js                 Service Worker (Web-Push) - MUSS im Root liegen, nicht unter js/
+├── manifest.json         PWA-Manifest
+└── js/
+    ├── config.js         Zentrale Konfiguration (API_BASE-URL des Backends)
+    ├── api.js            Schlanker fetch()-Wrapper für alle Backend-Endpunkte
+    ├── i18n.js           Mehrsprachigkeit (DE/EN), Wörterbuch + Sprachumschaltung
+    ├── app.js            Hauptlogik: Tabs, Suche, Abfahrtstafel, Favoriten, Routenplaner
+    ├── splitflap.js       Flip-Animation der Abfahrtstafel (+ Screenreader-Textalternative)
+    ├── modefilter.js      Wiederverwendbare Verkehrsmittel-Filter-Chips
+    ├── livemap.js         Live-Karte (Leaflet): Radar-Modus, Trip-Tracking, Isolations-Modus
+    ├── tripmodal.js       Fahrt-Detail-Modal (Zwischenhalte, Mini-Karte, Verspätungsstatistik)
+    ├── tripalarm.js       Fahrtalarm ("wecke mich X Stationen vorher")
+    └── push.js            Web-Push: Service-Worker-Registrierung, Abo-Verwaltung
 ```
 
-Öffne `.env` und passe mindestens `API_KEY` an (z.B. mit `openssl rand -hex 32` erzeugen).
+## Einrichtung / Deployment
 
-## 2. Lokal starten
+Keine Installation nötig – es sind statische Dateien. Einfach den kompletten
+Ordnerinhalt auf einen Webserver (nginx, Apache, Vercel, o.ä.) legen.
 
-```bash
-npm start
-```
+**Wichtig:**
+- `sw.js` muss im **Root** des ausgelieferten Verzeichnisses liegen (dort, wo
+  auch `index.html` liegt), nicht unter `js/`. Der Geltungsbereich eines
+  Service Workers ist standardmäßig auf sein eigenes Verzeichnis und alles
+  darunter beschränkt.
+- Web Push (und Service Worker generell) funktionieren nur über **HTTPS**
+  (oder `localhost` während der Entwicklung).
+- In `js/config.js` die Backend-URL eintragen:
+  ```js
+  window.APP_CONFIG = {
+    API_BASE: 'https://dein-server.example/live_navi',
+  };
+  ```
 
-Test:
+## Features im Überblick
 
-```bash
-curl http://localhost:3000/health
-curl "http://localhost:3000/live_navi/stations/search?query=Alexanderplatz"
-```
+- **Abfahrten**: Live-Abfahrtstafel (VBB + echte DB-Bahnhöfe), Verkehrsmittel-Filter,
+  Gleiswechsel-Hinweis, Störungen & Aufzugsstatus direkt unter der Tafel
+- **Route**: Routenplanung über eine selbst gehostete OTP2-Instanz, konfigurierbarer
+  Umstiegszeit-Puffer, rollstuhlgerechte Verbindungen, Route teilen (Link)
+- **Karte**: Live-Fahrzeugpositionen, Fahrt isolieren/verfolgen, display-breite
+  Darstellung auf jeder Bildschirmgröße
+- **Favoriten**: eigener Tab, Live-Vorschau der nächsten Abfahrt, Störungs-Badges
+- **Fahrtalarm**: weckt X Stationen vor dem Ziel (Ton, Vibration, Vollbild-Overlay)
+- **Push-Benachrichtigungen**: funktionieren auch bei geschlossenem Tab/Browser
+  (Service Worker + Web Push, siehe `js/push.js`)
+- **Verlauf**: zuletzt gesuchte Haltestellen, direkt als Vorschläge im Suchfeld
+- **Mehrsprachigkeit**: Deutsch/Englisch, automatische Browsersprache-Erkennung
+- **Barrierefreiheit**: Tastaturbedienung überall (inkl. Suche), ARIA-Tab-Pattern,
+  Fokus-Fallen in Dialogen, Screenreader-Textalternative zur Flip-Animation,
+  `aria-live`-Regionen für Störungen/Ergebnisse
 
-## 3. Als Dienst laufen lassen (systemd)
+## Browser-Unterstützung
 
-1. Projekt auf den Server kopieren, z.B. nach `/home/pi/oepnv-navi-backend`
-2. `oepnv-navi-backend.service.example` nach `/etc/systemd/system/oepnv-navi-backend.service`
-   kopieren und die Platzhalter (`DEIN_USER`, Pfade) anpassen
-3. Aktivieren:
+Moderne Evergreen-Browser (Chrome, Firefox, Safari, Edge). Nutzt u. a.
+`fetch`, `IntersectionObserver`-freies Vanilla-DOM, Service Worker, Push API,
+CSS Custom Properties und `dvh`-Einheiten (mit `vh`-Fallback). Kein IE11-Support.
 
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now oepnv-navi-backend
-sudo systemctl status oepnv-navi-backend
-```
+## Bekannte Grenzen
 
-## 4. Einrichtung in Nginx Proxy Manager (NPM)
-
-Da Backend-Server und NPM auf unterschiedlichen Hosts im selben LAN laufen, brauchst du
-die **lokale IP** des Backend-Servers (z.B. `192.168.1.50`) und den Port aus `.env` (Standard `3000`).
-
-**Falls `serverlele.ddns.net` schon einen Proxy Host für deine Web-App hat:**
-
-1. In NPM → *Proxy Hosts* → bestehenden Eintrag für `serverlele.ddns.net` öffnen
-2. Tab *Custom Locations* → *Add location*
-   - **Location**: `/live_navi`
-   - **Scheme**: `http`
-   - **Forward Hostname / IP**: die LAN-IP deines Backend-Servers, z.B. `192.168.1.50`
-   - **Forward Port**: `3000`
-3. Speichern
-
-**Falls es noch keinen Proxy Host für die Domain gibt:**
-
-1. *Proxy Hosts* → *Add Proxy Host*
-2. Domain: `serverlele.ddns.net`
-3. Scheme/Forward: kann auf deine bestehende Web-App zeigen (Root `/`)
-4. SSL-Tab: Let's Encrypt Zertifikat aktivieren (Force SSL empfehlenswert)
-5. Danach wie oben die Custom Location `/live_navi` hinzufügen
-
-Wichtig: Das Backend selbst lauscht (via `BASE_PATH` in `.env`) bereits unter `/live_navi/...`,
-weil NPM den vollen Pfad inkl. Präfix an das Backend weiterreicht. Du musst also **keine**
-zusätzliche Rewrite-Regel in NPM konfigurieren – einfach die Custom Location wie oben anlegen.
-
-Test von außen, sobald DNS/Portfreigabe für `serverlele.ddns.net` stehen:
-
-```bash
-curl https://serverlele.ddns.net/live_navi/health
-```
-
-## 5. API-Übersicht
-
-| Methode | Pfad                              | Auth      | Beschreibung                                  |
-|---------|------------------------------------|-----------|------------------------------------------------|
-| GET     | `/live_navi/health`               | –         | Health-Check                                   |
-| GET     | `/live_navi/stations/search`      | –         | Haltestellensuche (`?query=`)                  |
-| GET     | `/live_navi/stations/:id`         | –         | Details einer Haltestelle                      |
-| GET     | `/live_navi/departures/:stationId`| –         | Live-Abfahrten (`?duration=&results=`)         |
-| GET     | `/live_navi/journeys`             | –         | Routenplaner (`?from=&to=&when=`)              |
-| GET     | `/live_navi/radar`                | –         | Live-Fahrzeugpositionen (`?north=&west=&south=&east=`) |
-| GET     | `/live_navi/favorites`            | –         | Liste der Favoriten                            |
-| POST    | `/live_navi/favorites`            | API-Key   | Favorit anlegen                                |
-| DELETE  | `/live_navi/favorites/:id`        | API-Key   | Favorit löschen                                |
-| POST    | `/live_navi/push/register`        | API-Key   | Push-Token registrieren                        |
-
-Für geschützte Endpunkte den Header `X-API-Key: <dein-key-aus-.env>` mitschicken.
-
-## 6. Nächste Schritte
-
-- Rate-Limit-Werte in `src/server.js` an echten Bedarf anpassen
-- Später: Push-Notifications (APNs) auf Basis der `push_tokens`-Tabelle bauen
-- Später: iOS-App (Swift/SwiftUI) als Client gegen dieses Backend entwickeln
+- Die Live-Karte ist für blinde Nutzer naturgemäß eingeschränkt zugänglich
+  (Leaflet-Karten sind visuell) – Abfahrtstafel und Routenplaner liefern
+  dieselben Informationen barrierefrei.
+- Störungstexte kommen direkt von VBB/HAFAS auf Deutsch – eine Übersetzung
+  ins Englische findet nicht statt (nur die App-Oberfläche selbst ist zweisprachig).
+- Fahrtalarm-Ton und Vollbild-Overlay funktionieren nur bei offenem Tab; bei
+  geschlossenem Browser zeigt ein Push nur die Systembenachrichtigung.
