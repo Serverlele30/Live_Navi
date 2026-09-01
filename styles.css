@@ -50,6 +50,20 @@ html, body {
      Live-Karte (100vw kann inkl. Scrollbar-Breite minimal über die
      tatsächliche Fensterbreite hinausschießen). */
   overflow-x: hidden;
+  /* Unterdrückt Doppel-Tipp-Zoom auf Mobilgeräten, den manche Browser auch
+     bei user-scalable=no im Viewport-Meta-Tag noch zulassen - normales
+     vertikales Scrollen/Wischen bleibt davon unberührt. Die Live-Karte ist
+     unten explizit ausgenommen, damit Leaflets eigene Pinch-Geste zum
+     Zoomen der Karte selbst weiterhin funktioniert. */
+  touch-action: manipulation;
+}
+
+/* Ausnahme für die Live-Karte: Leaflet steuert das Zoomen/Verschieben der
+   Kartenansicht komplett selbst über eigene Touch-Gesten (unabhängig vom
+   deaktivierten Seiten-Zoom oben) - braucht dafür die volle Touch-Kontrolle. */
+#live-map,
+#live-map * {
+  touch-action: none;
 }
 
 button {
