@@ -233,6 +233,40 @@ button {
   margin: 0;
 }
 
+/* Der Footer-Hinweis ganz unten unter der App hatte bisher gar kein Styling -
+   erschien als unformatierter Fließtext direkt am Seitenende. */
+.global-disclaimer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--ink-muted);
+  font-size: 11.5px;
+  padding: 18px 16px 28px;
+  border-top: 1px solid var(--line);
+  margin-top: 8px;
+}
+
+/* Neutrales Info-Icon (blau) - eigene Variante neben dem roten Warn-Icon
+   (.disclaimer-banner__icon/.notice-item__icon), für Hinweise, die keine
+   Warnung sind, sondern reine Sachinformation ("Daten von VBB", etc.). */
+.global-disclaimer__icon,
+.info-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  font-style: normal;
+  background: rgba(79, 168, 232, 0.16);
+  color: var(--signal-blue);
+}
+
 /* Störungsbenachrichtigungen-Karte auf dem Favoriten-Tab - bewusst als
    eigenständige, einladende Karte statt eines unauffälligen Text-Links,
    da das eine der nützlichsten Funktionen der App ist. */
@@ -1973,6 +2007,9 @@ button:active { transform: translateY(1px); }
    ============================================================ */
 
 .disclaimer-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   background: rgba(255, 93, 108, 0.1);
   border: 1px solid var(--signal-red);
   color: var(--signal-red);
@@ -1982,6 +2019,20 @@ button:active { transform: translateY(1px); }
   margin-bottom: 18px;
   line-height: 1.4;
 }
+.disclaimer-banner__icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 1px;
+  background: rgba(255, 93, 108, 0.16);
+}
+.disclaimer-banner__text { flex: 1; }
 
 .fare-group {
   margin-bottom: 20px;
@@ -2111,6 +2162,7 @@ button:active { transform: translateY(1px); }
   .mobile-nav__item small { font-size: 10px; }
   .mobile-nav__item.is-active { color: var(--signal-amber); }
   .toast-container { bottom: calc(64px + env(safe-area-inset-bottom) + 12px); }
+  .global-disclaimer { padding-bottom: calc(28px + 64px + env(safe-area-inset-bottom)); }
 }
 
 @media (max-width: 430px) {

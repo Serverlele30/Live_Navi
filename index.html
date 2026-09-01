@@ -10,6 +10,10 @@
   <meta name="apple-mobile-web-app-title" content="ÖPNV Navi" />
   <meta name="theme-color" content="#0C1116" />
   <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600&display=swap" rel="stylesheet" />
@@ -190,7 +194,10 @@
 
     <section class="tab-panel" data-tab-panel="fares" hidden>
       <div class="panel-heading"><div><span class="section-heading__eyebrow" data-i18n="fares.eyebrow">PREISE</span><h1 data-i18n="fares.title">Tickets</h1><p data-i18n="fares.text">Übliche VBB-Fahrpreise auf einen Blick.</p></div></div>
-      <div class="disclaimer-banner"><span aria-hidden="true">⚠</span> <span data-i18n="fares.disclaimer">Angaben ohne Gewähr – Preise können sich ändern.</span> <span id="fares-stand"></span></div>
+      <div class="disclaimer-banner">
+        <span class="disclaimer-banner__icon" aria-hidden="true">⚠</span>
+        <span class="disclaimer-banner__text"><span data-i18n="fares.disclaimer">Angaben ohne Gewähr – Preise können sich ändern.</span> <span id="fares-stand"></span></span>
+      </div>
       <div id="fares-content"><div class="board-empty-state" data-i18n="fares.loading">Lade Fahrpreise…</div></div>
       <div class="section-heading"><div><h2 data-i18n="fares.buyTitle">Tickets kaufen</h2></div></div>
       <div id="fares-companies" class="company-links"></div>
@@ -218,7 +225,10 @@
     </section>
   </main>
 
-  <div class="global-disclaimer" data-i18n="common.footer">ℹ Live-Daten von VBB · Angaben ohne Gewähr</div>
+  <div class="global-disclaimer">
+    <span class="global-disclaimer__icon" aria-hidden="true">ℹ</span>
+    <span data-i18n="common.footer">Live-Daten von VBB · Angaben ohne Gewähr</span>
+  </div>
 
   <nav class="mobile-nav" aria-label="Hauptnavigation mobil">
     <div role="tablist" aria-label="Hauptnavigation mobil" class="mobile-nav__list">
