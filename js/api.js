@@ -154,6 +154,13 @@ const API = (() => {
       return request('/fares');
     },
 
+    // Einfacher Verbindungstest gegen den Health-Dashboard-Endpoint, analog
+    // zu APIClient.checkHealth() in der iOS-App - prüft nur, ob das Backend
+    // erreichbar ist (Reverse-Proxy/DNS/VPS korrekt konfiguriert).
+    checkHealth() {
+      return request('/health/full');
+    },
+
     getNearbyDisruptions({ lat, lon, distance, stops }) {
       return request(`/disruptions/nearby?${qs({ lat, lon, distance, stops })}`);
     },

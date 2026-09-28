@@ -150,6 +150,12 @@ const TripAlarm = (() => {
   }
 
   function notify(title, body) {
+    if (window.NotificationStore) {
+      NotificationStore.add({ title, body, icon: '⏰' }).then(() => {
+        const badge = document.getElementById('notifications-badge');
+        if (badge) badge.hidden = false;
+      }).catch(() => {});
+    }
     if (window.Notification && Notification.permission === 'granted') {
       try {
         new Notification(title, { body, tag: 'oepnv-navi-fahrtalarm' });

@@ -5,6 +5,7 @@ const App = (() => {
   const SEEN_DISRUPTIONS_KEY = 'oepnv-navi:db-seen-disruptions';
   const WHEELCHAIR_KEY = 'oepnv-navi:db-wheelchair';
   const BIKE_KEY = 'oepnv-navi:db-bike';
+  const SIMPLE_MODE_KEY = 'oepnv-navi:db-simple-mode';
   const FAVORITES_POLL_MS = 30000;
   const MAX_VIAS = 3;
   const VIA_WAIT_OPTIONS = [0, 5, 10, 15, 20, 30, 45, 60];
@@ -209,17 +210,150 @@ const App = (() => {
   function notifyNewDisruption(favName, disruption) {
     const message = `${favName}: ${disruption.summary || 'Neue Störung'}`;
     showToast(message, 'warning');
+    const body = disruption.summary || disruption.text || 'Es liegt eine neue Störungsmeldung vor.';
+    recordNotification({ title: 'Störung bei ' + favName, body, icon: '⚠' });
 
     if (window.Notification && Notification.permission === 'granted') {
       try {
         new Notification('Störung bei ' + favName, {
-          body: disruption.summary || disruption.text || 'Es liegt eine neue Störungsmeldung vor.',
+          body,
           tag: `oepnv-navi-disruption-${favName}-${disruptionKey(disruption)}`,
         });
       } catch (err) {
         console.error('Notification-Fehler:', err.message);
       }
     }
+  }
+
+  // ---------- Benachrichtigungscenter ----------
+  //
+  // Persistiert lokal ausgelöste Benachrichtigungen (Störungen, Fahrtalarm)
+  // im selben IndexedDB-Store wie eingehende Web-Push-Nachrichten (siehe
+  // sw.js + js/notifications.js), damit der "Benachrichtigungen"-Tab wirklich
+  // alles zeigt, was aktuell eine Meldung auslöst - analog zum Glocken-Icon
+  // in der iOS-App.
+  function recordNotification({ title, body, icon }) {
+    if (!window.NotificationStore) return;
+    NotificationStore.add({ title, body, icon }).then(refreshNotificationBadge).catch(() => {});
+  }
+
+  async function refreshNotificationBadge() {
+    const badge = document.getElementById('notifications-badge');
+    if (!badge || !window.NotificationStore) return;
+    try {
+      const count = await NotificationStore.unreadCount();
+      badge.hidden = count === 0;
+    } catch (_) {
+      // IndexedDB evtl. nicht verfügbar (z.B. privater Modus) - Badge bleibt einfach versteckt
+    }
+  }
+
+  async function loadNotificationsPanel() {
+    const listEl = document.getElementById('notifications-list');
+    if (!listEl || !window.NotificationStore) return;
+
+    try {
+      const entries = await NotificationStore.list();
+      listEl.innerHTML = '';
+
+      if (entries.length === 0) {
+        listEl.innerHTML = `<div class="board-empty-state">${escapeHtml(I18N.t('notifications.empty'))}</div>`;
+      } else {
+        entries.forEach((entry) => {
+          const item = document.createElement('div');
+          item.className = `notification-item${entry.read ? '' : ' notification-item--unread'}`;
+          item.setAttribute('role', 'listitem');
+          const time = new Date(entry.timestamp).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+          item.innerHTML = `
+            <span class="notification-item__icon" aria-hidden="true">${escapeHtml(entry.icon || '🔔')}</span>
+            <div class="notification-item__body">
+              <strong>${escapeHtml(entry.title || '')}</strong>
+              <span>${escapeHtml(entry.body || '')}</span>
+            </div>
+            <span class="notification-item__time">${time}</span>
+          `;
+          listEl.appendChild(item);
+        });
+      }
+
+      await NotificationStore.markAllRead();
+      refreshNotificationBadge();
+    } catch (err) {
+      listEl.innerHTML = `<div class="board-error">⚠ ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  function initNotificationsPanel() {
+    const clearBtn = document.getElementById('notifications-clear-btn');
+    if (clearBtn && window.NotificationStore) {
+      clearBtn.addEventListener('click', async () => {
+        await NotificationStore.clear();
+        loadNotificationsPanel();
+      });
+    }
+
+    // Der Service Worker meldet per postMessage, sobald eine Push-
+    // Benachrichtigung eintraf (siehe sw.js) - Badge sofort aktualisieren,
+    // auch während die App gerade offen ist.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'oepnv-navi:notification-added') {
+          refreshNotificationBadge();
+          if (document.querySelector('[data-tab-panel="notifications"]:not([hidden])')) {
+            loadNotificationsPanel();
+          }
+        }
+      });
+    }
+
+    refreshNotificationBadge();
+  }
+
+  // ---------- Einstellungen ----------
+
+  // Einfacher Modus: moderat größere Schrift + weniger Optionen auf einen
+  // Blick (Verkehrsmittel-Filter/Fahrrad-Option im Routenplaner ausgeblendet),
+  // analog zum "Einfachen Modus" in der iOS-App - bewusst NICHT die
+  // Accessibility-Schriftgrößen-Stufe, die ist für Screenreader-Nutzung
+  // gedacht, nicht zum "einfacher gestalten".
+  function applySimpleMode(enabled) {
+    document.documentElement.classList.toggle('simple-mode', enabled);
+  }
+
+  function initSettingsPanel() {
+    const toggle = document.getElementById('settings-simple-mode');
+    if (!toggle) return;
+    const enabled = localStorage.getItem(SIMPLE_MODE_KEY) === 'true';
+    toggle.checked = enabled;
+    applySimpleMode(enabled);
+    toggle.addEventListener('change', () => {
+      localStorage.setItem(SIMPLE_MODE_KEY, toggle.checked ? 'true' : 'false');
+      applySimpleMode(toggle.checked);
+    });
+  }
+
+  // ---------- "Mehr": Verbindungstest ----------
+
+  function initMorePanel() {
+    const btn = document.getElementById('connection-test-btn');
+    const statusEl = document.getElementById('connection-status');
+    if (!btn || !statusEl) return;
+
+    btn.addEventListener('click', async () => {
+      statusEl.textContent = '…';
+      statusEl.className = 'connection-status';
+      btn.disabled = true;
+      try {
+        await API.checkHealth();
+        statusEl.textContent = I18N.t('more.connectionOk');
+        statusEl.classList.add('connection-status--ok');
+      } catch (err) {
+        statusEl.textContent = I18N.t('more.connectionError');
+        statusEl.classList.add('connection-status--error');
+      } finally {
+        btn.disabled = false;
+      }
+    });
   }
 
   function renderFavoriteDisruption(card, favName, disruptions, seenMap, favId) {
@@ -1003,6 +1137,10 @@ const App = (() => {
     if (tabName === 'fares' && !faresLoadedOnce) {
       loadFares();
     }
+
+    if (tabName === 'notifications') {
+      loadNotificationsPanel();
+    }
   }
 
   function initNearby() {
@@ -1766,6 +1904,9 @@ const App = (() => {
     initNearby();
     initNearbyDisruptions();
     initNotifications();
+    initNotificationsPanel();
+    initSettingsPanel();
+    initMorePanel();
     TripAlarm.load();
     renderFavoriteChips();
     renderRecentSearches();

@@ -7,6 +7,17 @@
 // Service Workers ist standardmäßig auf sein eigenes Verzeichnis und alles
 // darunter beschränkt.
 
+// Schreibt jede eingehende Push-Nachricht zusätzlich in den persistenten
+// Benachrichtigungsverlauf (js/notifications.js), damit sie im "Mehr" >
+// "Benachrichtigungen"-Tab sichtbar ist - auch wenn sie ankam, während kein
+// Tab offen war (der Store läuft über IndexedDB, nicht über die Seite).
+try {
+  self.importScripts('./js/notifications.js');
+} catch (err) {
+  // Sollte importScripts fehlschlagen, bleibt die Push-Zustellung selbst
+  // trotzdem funktionsfähig - nur der Verlauf fehlt dann.
+}
+
 self.addEventListener('install', () => {
   self.skipWaiting();
 });
@@ -32,7 +43,17 @@ self.addEventListener('push', (event) => {
     data: { url: data.url || '/' },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(title, options),
+      (typeof NotificationStore !== 'undefined'
+        ? NotificationStore.add({ title, body: options.body, url: options.data.url }).catch(() => {})
+        : Promise.resolve()),
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        clientList.forEach((client) => client.postMessage({ type: 'oepnv-navi:notification-added' }));
+      }),
+    ]),
+  );
 });
 
 // Klick auf die Benachrichtigung: vorhandenen App-Tab in den Vordergrund

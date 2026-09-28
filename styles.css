@@ -1153,6 +1153,17 @@ button:active { transform: translateY(1px); }
   justify-content: center;
 }
 .header-icon-btn:hover { border-color: var(--signal-amber); }
+.header-icon-btn { position: relative; }
+.notifications-badge {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--signal-red);
+  border: 1.5px solid var(--panel-raised);
+}
 
 .favorites-bar { display: none; }
 .tab-nav {
@@ -1525,6 +1536,68 @@ button:active { transform: translateY(1px); }
 }
 .recent-item__remove:hover { background: var(--panel-raised); color: var(--signal-red); }
 .recent-empty { color: var(--ink-muted); font-size: 12px; padding: 8px 0; }
+
+.connection-check {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
+}
+.connection-check__row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+.connection-status { color: var(--ink-muted); font-weight: 600; }
+.connection-status--ok { color: var(--signal-green); }
+.connection-status--error { color: var(--signal-red); }
+
+.settings-section {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 16px; margin-bottom: 16px;
+}
+.settings-section .section-heading { margin-bottom: 10px; }
+.settings-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  cursor: pointer;
+}
+.settings-toggle__text { display: flex; flex-direction: column; gap: 2px; }
+.settings-toggle__text strong { font-size: 14px; }
+.settings-toggle__text small { color: var(--ink-muted); font-size: 12px; }
+.settings-toggle input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none; flex-shrink: 0;
+  width: 44px; height: 26px; border-radius: 999px;
+  background: var(--panel-raised); border: 1px solid var(--line);
+  position: relative; cursor: pointer;
+}
+.settings-toggle input[type="checkbox"]::before {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--ink-muted); transition: transform .15s ease, background .15s ease;
+}
+.settings-toggle input[type="checkbox"]:checked { border-color: var(--signal-amber); background: rgba(245,166,35,.18); }
+.settings-toggle input[type="checkbox"]:checked::before { background: var(--signal-amber); transform: translateX(18px); }
+
+.notifications-list { display: flex; flex-direction: column; gap: 8px; }
+.notification-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
+  padding: 12px 14px;
+}
+.notification-item__icon { font-size: 18px; flex-shrink: 0; }
+.notification-item__body { flex: 1; min-width: 0; }
+.notification-item__body strong { display: block; font-size: 13px; }
+.notification-item__body span { display: block; color: var(--ink-muted); font-size: 12px; margin-top: 2px; }
+.notification-item__time { color: var(--ink-muted); font-size: 11px; flex-shrink: 0; white-space: nowrap; }
+.notification-item--unread { border-color: var(--signal-amber); }
+
+/* ============================================================
+   Einfacher Modus — moderat größere Schrift, reduzierte Optionen
+   (siehe Settings-Toggle in js/app.js, analog zur iOS-App)
+   ============================================================ */
+html.simple-mode { font-size: 112%; }
+html.simple-mode .journey-modes-field,
+html.simple-mode #journey-bike-row,
+html.simple-mode .journey-add-via {
+  display: none;
+}
+html.simple-mode .journey-submit,
+html.simple-mode .location-btn,
+html.simple-mode .when-choice { min-height: 46px; }
 
 .lang-switch { display: flex; gap: 8px; }
 .lang-switch__btn {
@@ -2198,10 +2271,11 @@ button:active { transform: translateY(1px); }
 
 @media (max-width: 700px) {
   body { padding-bottom: 66px; }
-  .app-header { height: auto; min-height: 64px; padding: 10px 12px; gap: 12px; }
+  .app-header { height: auto; min-height: 64px; padding: 10px 12px; gap: 8px; }
   .brand { font-size: 15px; }
   .search-box--global { min-width: 0; }
   .search-box--global input { font-size: 14px; padding: 10px 38px; }
+  .header-icon-btn { width: 34px; height: 34px; font-size: 15px; }
   .tab-nav { display: none; }
   .app-main { padding: 16px 12px 28px; }
   .welcome-panel { padding: 20px 16px; }
@@ -2227,10 +2301,10 @@ button:active { transform: translateY(1px); }
        bedienbar bleiben, unabhängig von der Karte. */
     z-index: 1100; background: rgba(23,30,38,.97); border-top: 1px solid var(--line); padding: 5px 4px calc(5px + env(safe-area-inset-bottom));
   }
-  .mobile-nav__list { display: grid; grid-template-columns: repeat(4, 1fr); }
-  .mobile-nav__item { border: 0; background: transparent; color: var(--ink-muted); padding: 5px 2px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-  .mobile-nav__item span { font-size: 18px; line-height: 1.1; }
-  .mobile-nav__item small { font-size: 10px; }
+  .mobile-nav__list { display: grid; grid-template-columns: repeat(6, 1fr); }
+  .mobile-nav__item { border: 0; background: transparent; color: var(--ink-muted); padding: 5px 1px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .mobile-nav__item span { font-size: 16px; line-height: 1.1; }
+  .mobile-nav__item small { font-size: 8.5px; }
   .mobile-nav__item.is-active { color: var(--signal-amber); }
   .toast-container { bottom: calc(64px + env(safe-area-inset-bottom) + 12px); }
   .global-disclaimer { padding-bottom: calc(28px + 64px + env(safe-area-inset-bottom)); }

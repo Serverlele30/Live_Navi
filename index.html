@@ -35,14 +35,20 @@
       <ul id="search-results" class="search-results" role="listbox" aria-label="Suchergebnisse" data-i18n-aria-label="search.resultsLabel" hidden></ul>
     </div>
 
+    <button id="header-settings-btn" class="header-icon-btn" data-tab="settings" type="button" title="Einstellungen" data-i18n-title="nav.settings" aria-label="Einstellungen" data-i18n-aria-label="nav.settings">⚙</button>
+    <button id="header-notifications-btn" class="header-icon-btn" data-tab="notifications" type="button" title="Benachrichtigungen" data-i18n-title="nav.notifications" aria-label="Benachrichtigungen" data-i18n-aria-label="nav.notifications">
+      🔔<span id="notifications-badge" class="notifications-badge" hidden></span>
+    </button>
     <button id="header-favorites-btn" class="header-icon-btn" data-tab="favorites" type="button" title="Favoriten" data-i18n-title="nav.favorites" aria-label="Favoriten" data-i18n-aria-label="nav.favorites">★</button>
   </header>
 
   <nav class="tab-nav" aria-label="Hauptnavigation">
     <div role="tablist" aria-label="Hauptnavigation" class="tab-nav__list">
       <button class="tab-button is-active" role="tab" aria-selected="true" aria-controls="panel-departures" id="tab-departures" tabindex="0" data-tab="departures"><span class="tab-button__icon" aria-hidden="true">🚏</span> <span data-i18n="nav.departures">Abfahrten</span></button>
+      <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-favorites" id="tab-favorites" tabindex="-1" data-tab="favorites"><span class="tab-button__icon" aria-hidden="true">★</span> <span data-i18n="favorites.title">Favoriten</span></button>
       <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-journey" id="tab-journey" tabindex="-1" data-tab="journey"><span class="tab-button__icon" aria-hidden="true">🧭</span> <span data-i18n="nav.route">Route</span></button>
       <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-map" id="tab-map" tabindex="-1" data-tab="map"><span class="tab-button__icon" aria-hidden="true">🗺</span> <span data-i18n="nav.map">Karte</span></button>
+      <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-disruptions" id="tab-disruptions" tabindex="-1" data-tab="disruptions"><span class="tab-button__icon" aria-hidden="true">⚠</span> <span data-i18n="disruptions.title">Störungen</span></button>
       <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-more" id="tab-more" tabindex="-1" data-tab="more"><span class="tab-button__icon" aria-hidden="true">☰</span> <span data-i18n="nav.more">Mehr</span></button>
     </div>
   </nav>
@@ -167,7 +173,7 @@
       <div id="nearby-list" class="nearby-list"><div class="board-empty-state" data-i18n="nearby.emptyState">Nutze deinen Standort, um Haltestellen in deiner Nähe zu finden.</div></div>
     </section>
 
-    <section class="tab-panel" data-tab-panel="favorites" hidden>
+    <section class="tab-panel" data-tab-panel="favorites" id="panel-favorites" role="tabpanel" aria-labelledby="tab-favorites mobile-tab-favorites" tabindex="-1" hidden>
       <div class="panel-heading">
         <div><span class="section-heading__eyebrow" data-i18n="favorites.eyebrow">SCHNELLZUGRIFF</span><h1 data-i18n="favorites.title">Meine Haltestellen</h1><p data-i18n="favorites.text">Deine gespeicherten Haltestellen mit Live-Abfahrten und Störungshinweisen.</p></div>
       </div>
@@ -185,7 +191,7 @@
       </div>
     </section>
 
-    <section class="tab-panel" data-tab-panel="disruptions" hidden>
+    <section class="tab-panel" data-tab-panel="disruptions" id="panel-disruptions" role="tabpanel" aria-labelledby="tab-disruptions mobile-tab-disruptions" tabindex="-1" hidden>
       <div class="panel-heading"><div><span class="section-heading__eyebrow" data-i18n="common.current">AKTUELL</span><h1 data-i18n="disruptions.title">Störungen</h1><p data-i18n="disruptions.text">Ortsbezogene und netzweite Hinweise.</p></div></div>
       <div class="disruption-section">
         <div class="section-heading"><div><h2 data-i18n="disruptions.nearbyTitle">In deiner Nähe</h2></div></div>
@@ -212,21 +218,57 @@
     <section class="tab-panel" data-tab-panel="more" id="panel-more" role="tabpanel" aria-labelledby="tab-more mobile-tab-more" tabindex="-1" hidden>
       <div class="panel-heading"><div><span class="section-heading__eyebrow" data-i18n="more.eyebrow">WEITERE FUNKTIONEN</span><h1 data-i18n="nav.more">Mehr</h1><p data-i18n="more.text">Alles, was nicht bei jeder Fahrt gebraucht wird.</p></div></div>
       <div class="more-grid">
-        <button class="more-card" data-open-tab="favorites" type="button"><span aria-hidden="true">★</span><strong data-i18n="favorites.title">Favoriten</strong><small data-i18n="more.favoritesText">Deine gespeicherten Haltestellen</small></button>
         <button class="more-card" data-open-tab="nearby" type="button"><span aria-hidden="true">📍</span><strong data-i18n="nearby.title">In der Nähe</strong><small data-i18n="more.nearbyText">Haltestellen in deiner Umgebung</small></button>
-        <button class="more-card" data-open-tab="disruptions" type="button"><span aria-hidden="true">⚠</span><strong data-i18n="disruptions.title">Störungen</strong><small data-i18n="more.disruptionsText">Ortsbezogen &amp; netzweit</small></button>
         <button class="more-card" data-open-tab="fares" type="button"><span aria-hidden="true">🎫</span><strong data-i18n="fares.title">Tickets</strong><small data-i18n="more.faresText">Preise &amp; wo kaufen</small></button>
+        <button class="more-card" data-open-tab="notifications" type="button"><span aria-hidden="true">🔔</span><strong data-i18n="notifications.title">Benachrichtigungen</strong><small data-i18n="more.notificationsText">Verlauf &amp; Push-Status</small></button>
+        <button class="more-card" data-open-tab="settings" type="button"><span aria-hidden="true">⚙</span><strong data-i18n="nav.settings">Einstellungen</strong><small data-i18n="more.settingsText">Sprache, Anzeige &amp; mehr</small></button>
       </div>
       <div class="recent-section">
         <div class="section-heading"><div><span class="section-heading__eyebrow" data-i18n="more.historyEyebrow">VERLAUF</span><h2 data-i18n="more.historyTitle">Zuletzt gesucht</h2></div><button id="clear-recent" class="text-button" type="button" data-i18n="common.clear">Leeren</button></div>
         <div id="recent-searches" class="recent-searches" role="list"></div>
       </div>
       <div class="recent-section">
-        <div class="section-heading"><div><span class="section-heading__eyebrow" data-i18n="more.langEyebrow">SPRACHE / LANGUAGE</span><h2 data-i18n="more.langTitle">Sprache</h2></div></div>
+        <div class="section-heading"><div><span class="section-heading__eyebrow" data-i18n="more.aboutEyebrow">ÜBER</span><h2 data-i18n="more.aboutTitle">App-Info</h2></div></div>
+        <div class="connection-check">
+          <div class="connection-check__row">
+            <span data-i18n="more.backend">Backend</span>
+            <span id="connection-status" class="connection-status">–</span>
+          </div>
+          <button id="connection-test-btn" class="text-button" type="button" data-i18n="more.testConnection">Verbindung testen</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-tab-panel="settings" id="panel-settings" role="tabpanel" aria-labelledby="header-settings-btn" tabindex="-1" hidden>
+      <div class="panel-heading"><div><span class="section-heading__eyebrow" data-i18n="settings.eyebrow">EINSTELLUNGEN</span><h1 data-i18n="nav.settings">Einstellungen</h1><p data-i18n="settings.text">Anzeige, Sprache und Benachrichtigungen anpassen.</p></div></div>
+
+      <div class="settings-section">
+        <div class="section-heading"><div><h2 data-i18n="settings.displayTitle">Anzeige</h2></div></div>
+        <label class="settings-toggle">
+          <div class="settings-toggle__text">
+            <strong data-i18n="settings.simpleModeTitle">Einfacher Modus</strong>
+            <small data-i18n="settings.simpleModeText">Größere Schrift, weniger Optionen auf einen Blick.</small>
+          </div>
+          <input type="checkbox" id="settings-simple-mode" />
+        </label>
+      </div>
+
+      <div class="settings-section">
+        <div class="section-heading"><div><h2 data-i18n="more.langTitle">Sprache</h2></div></div>
         <div class="lang-switch" role="group" aria-label="Sprache / Language">
           <button id="lang-de" class="lang-switch__btn" type="button" data-lang="de" aria-pressed="true">Deutsch</button>
           <button id="lang-en" class="lang-switch__btn" type="button" data-lang="en" aria-pressed="false">English</button>
         </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-tab-panel="notifications" id="panel-notifications" role="tabpanel" aria-labelledby="header-notifications-btn" tabindex="-1" hidden>
+      <div class="panel-heading">
+        <div><span class="section-heading__eyebrow" data-i18n="notifications.eyebrow">VERLAUF</span><h1 data-i18n="notifications.title">Benachrichtigungen</h1><p data-i18n="notifications.text">Alles, was zuletzt eine Push- oder In-App-Benachrichtigung ausgelöst hat.</p></div>
+        <button id="notifications-clear-btn" class="text-button" type="button" data-i18n="common.clear">Leeren</button>
+      </div>
+      <div id="notifications-list" class="notifications-list" role="list">
+        <div class="board-empty-state" data-i18n="notifications.empty">Noch keine Benachrichtigungen.</div>
       </div>
     </section>
   </main>
@@ -239,8 +281,10 @@
   <nav class="mobile-nav" aria-label="Hauptnavigation mobil">
     <div role="tablist" aria-label="Hauptnavigation mobil" class="mobile-nav__list">
       <button class="mobile-nav__item is-active" role="tab" aria-selected="true" aria-controls="panel-departures" id="mobile-tab-departures" tabindex="0" data-tab="departures"><span aria-hidden="true">🚏</span><small data-i18n="nav.departures">Abfahrten</small></button>
+      <button class="mobile-nav__item" role="tab" aria-selected="false" aria-controls="panel-favorites" id="mobile-tab-favorites" tabindex="-1" data-tab="favorites"><span aria-hidden="true">★</span><small data-i18n="favorites.title">Favoriten</small></button>
       <button class="mobile-nav__item" role="tab" aria-selected="false" aria-controls="panel-journey" id="mobile-tab-journey" tabindex="-1" data-tab="journey"><span aria-hidden="true">🧭</span><small data-i18n="nav.route">Route</small></button>
       <button class="mobile-nav__item" role="tab" aria-selected="false" aria-controls="panel-map" id="mobile-tab-map" tabindex="-1" data-tab="map"><span aria-hidden="true">🗺</span><small data-i18n="nav.map">Karte</small></button>
+      <button class="mobile-nav__item" role="tab" aria-selected="false" aria-controls="panel-disruptions" id="mobile-tab-disruptions" tabindex="-1" data-tab="disruptions"><span aria-hidden="true">⚠</span><small data-i18n="disruptions.title">Störungen</small></button>
       <button class="mobile-nav__item" role="tab" aria-selected="false" aria-controls="panel-more" id="mobile-tab-more" tabindex="-1" data-tab="more"><span aria-hidden="true">☰</span><small data-i18n="nav.more">Mehr</small></button>
     </div>
   </nav>
@@ -249,6 +293,7 @@
   <script src="js/config.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/notifications.js"></script>
   <script src="js/splitflap.js"></script>
   <script src="js/modefilter.js"></script>
   <script src="js/livemap.js"></script>
