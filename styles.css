@@ -167,6 +167,12 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  /* War vorher erst ab 701px zurückgesetzt - auf dem Handy trug der Button
+     dadurch noch den nativen Browser-Rahmen/-Innenabstand und hat oben
+     unnötig Platz gefressen. */
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .brand::before {
@@ -1175,11 +1181,6 @@ button:active { transform: translateY(1px); }
   padding: 0 max(20px, calc((100vw - 1120px) / 2));
   gap: 28px;
 }
-.brand {
-  border: 0;
-  background: transparent;
-  padding: 0;
-}
 .search-box--global { max-width: 620px; }
 .search-box--global input { padding: 12px 42px 12px 42px; font-size: 15px; }
 .search-box__icon {
@@ -1240,38 +1241,36 @@ button:active { transform: translateY(1px); }
 
 .favorites-bar { display: none; }
 
-/* Segmentierte Pill-Navigation statt schlichter Unterstreichung - der aktive
-   Tab bekommt einen vollen Amber-Verlauf-Hintergrund (dieselbe Formsprache
-   wie der primäre Such-Button), statt nur eine andere Textfarbe zu haben. */
+/* Flache Signage-Leiste statt schwebender Pille - die Reiter sitzen direkt
+   und randlos unter dem Header, wie eine Zug-Anzeigetafel mit Reitern statt
+   einer separaten "schwebenden Karte". Spart zudem vertikalen Platz. */
 .tab-nav {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 14px 20px;
+  padding: 0 20px;
   border-bottom: none;
 }
 .tab-nav__list {
-  display: inline-flex;
-  gap: 2px;
-  background: var(--panel);
-  border: var(--border-w) solid var(--line);
-  border-radius: var(--radius);
-  padding: 4px;
+  display: flex;
+  gap: 0;
+  border-bottom: var(--border-w) solid var(--line);
 }
 .tab-button {
-  padding: 10px 18px;
+  padding: 13px 16px;
   display: inline-flex;
-  gap: 8px;
+  gap: 7px;
   align-items: center;
-  border-radius: var(--radius);
-  border-bottom: none;
-  transition: background .18s ease, color .18s ease, box-shadow .18s ease;
+  border-radius: 0;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
 }
 .tab-button__icon { filter: grayscale(.35); transition: filter .18s ease; }
-.tab-button:hover:not(.is-active) { color: var(--ink); }
+.tab-button:hover:not(.is-active) { color: var(--ink); background: var(--panel-raised); }
 .tab-button.is-active {
-  background: linear-gradient(155deg, #E8894F, var(--signal-amber) 65%);
-  color: var(--on-amber);
-  box-shadow: var(--shadow-md);
+  background: var(--signal-amber-soft);
+  color: var(--signal-amber);
+  border-bottom-color: var(--signal-amber);
 }
 .tab-button.is-active .tab-button__icon { filter: none; }
 
@@ -2412,12 +2411,17 @@ html.simple-mode .when-choice { min-height: 46px; }
 
 @media (max-width: 700px) {
   body { padding-bottom: 84px; }
-  .app-header { height: auto; min-height: 64px; padding: 10px 12px; gap: 8px; }
-  .brand { font-size: 15px; gap: 7px; }
-  .brand::before { width: 24px; height: 24px; border-radius: var(--radius); font-size: 12px; }
-  .search-box--global { min-width: 0; }
-  .search-box--global input { font-size: 14px; padding: 10px 38px; }
-  .header-icon-btn { width: 34px; height: 34px; font-size: 15px; }
+  /* Header auf dem Handy so schmal wie möglich halten: Wortmarke weg (nur
+     das Icon bleibt als Home-Button), Icon-Buttons kleiner und enger, damit
+     die Suche echten Platz bekommt statt auf ein paar Pixel zusammengequetscht
+     zu werden - vorher war oben praktisch kein Raum mehr für die Eingabe. */
+  .app-header { height: auto; min-height: 56px; padding: 8px 10px; gap: 6px; }
+  .brand { gap: 0; }
+  .brand__mark { display: none; }
+  .brand::before { width: 30px; height: 30px; border-radius: var(--radius); font-size: 14px; }
+  .search-box--global { min-width: 0; flex: 1; }
+  .search-box--global input { font-size: 14px; padding: 9px 34px; }
+  .header-icon-btn { width: 32px; height: 32px; font-size: 14px; }
   .tab-nav { display: none; }
   .app-main { padding: 16px 12px 28px; }
   .welcome-panel { padding: 20px 16px; }
