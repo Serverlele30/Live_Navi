@@ -2410,7 +2410,7 @@ html.simple-mode .when-choice { min-height: 46px; }
 }
 
 @media (max-width: 700px) {
-  body { padding-bottom: 84px; }
+  body { padding-bottom: 92px; }
   /* Header auf dem Handy so schmal wie möglich halten: Wortmarke weg (nur
      das Icon bleibt als Home-Button), Icon-Buttons kleiner und enger, damit
      die Suche echten Platz bekommt statt auf ein paar Pixel zusammengequetscht
@@ -2464,12 +2464,23 @@ html.simple-mode .when-choice { min-height: 46px; }
     padding: 7px 1px; display: flex; flex-direction: column; align-items: center; gap: 2px;
     border-radius: 2px;
     transition: color .15s ease, background .15s ease;
+    min-width: 0;
   }
   .mobile-nav__item span { font-size: 16px; line-height: 1.1; }
-  .mobile-nav__item small { font-size: 8.5px; }
+  /* Feste einzeilige Höhe erzwingen - ein langes Label (z.B. "Meine
+     Haltestellen") ist sonst auf zwei Zeilen umgebrochen, hat die ganze
+     Leiste aufgebläht und dadurch den unteren Inhalt überlappt, weil die
+     reservierte body-padding-bottom nicht mehr ausgereicht hat. */
+  .mobile-nav__item small {
+    font-size: 8.5px;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .mobile-nav__item.is-active { color: var(--on-amber); background: var(--signal-amber); }
-  .toast-container { bottom: calc(66px + env(safe-area-inset-bottom) + 20px); }
-  .global-disclaimer { padding-bottom: calc(28px + 66px + env(safe-area-inset-bottom) + 20px); }
+  .toast-container { bottom: calc(74px + env(safe-area-inset-bottom) + 20px); }
+  .global-disclaimer { padding-bottom: calc(28px + 74px + env(safe-area-inset-bottom) + 20px); }
 }
 
 @media (max-width: 430px) {
