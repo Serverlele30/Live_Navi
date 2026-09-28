@@ -135,6 +135,15 @@ const App = (() => {
     const wasAdded = idx < 0;
     if (idx >= 0) {
       favorites.splice(idx, 1);
+      // Analog zum "seenDisruptions"-Aufräumen im Backend: ohne das hier würde
+      // der gemerkte Störungs-Stand für entfernte Favoriten für immer im
+      // localStorage hängen bleiben, weil er nur noch gepflegt (nicht mehr
+      // gelöscht) wird, sobald die Haltestelle nicht mehr abgefragt wird.
+      const seenMap = loadSeenDisruptions();
+      if (Object.prototype.hasOwnProperty.call(seenMap, station.id)) {
+        delete seenMap[station.id];
+        saveSeenDisruptions(seenMap);
+      }
     } else {
       favorites.push(station);
     }
@@ -1063,7 +1072,44 @@ const App = (() => {
 
   function restartDeparturesPolling() {
     if (departuresPollHandle) clearInterval(departuresPollHandle);
+    if (document.hidden) return; // läuft erst wieder los, sobald der Tab sichtbar wird (siehe initVisibilityPause)
     departuresPollHandle = setInterval(loadDepartures, 30000);
+  }
+
+  function stopDeparturesPolling() {
+    if (departuresPollHandle) {
+      clearInterval(departuresPollHandle);
+      departuresPollHandle = null;
+    }
+  }
+
+  // Pausiert die Abfahrts- und Favoriten-Live-Aktualisierung, solange der
+  // Browser-Tab im Hintergrund ist (Seite gewechselt, Bildschirm aus,
+  // App minimiert) - vorher liefen diese beiden 30s-Intervalle die gesamte
+  // Seitenlebensdauer über weiter, unabhängig davon, ob überhaupt jemand
+  // hinschaut. Das kostet unnötig Akku/Datenvolumen, gerade auf dem Handy.
+  // LiveMap pausiert schon länger korrekt über activateTab(); der
+  // Fahrtalarm (tripalarm.js) bleibt bewusst ausgenommen, da er
+  // sicherheitsrelevant ist und auch im Hintergrund weiterprüfen soll.
+  function initVisibilityPause() {
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopDeparturesPolling();
+        stopFavoritesPolling();
+      } else {
+        // Direkt beim Zurückkehren einmal aktualisieren (die Daten sind ja
+        // ggf. seit längerem veraltet) und die Intervalle neu starten.
+        if (currentStop) {
+          loadDepartures();
+          restartDeparturesPolling();
+        }
+        const favorites = loadFavorites();
+        if (favorites.length > 0) {
+          loadFavoriteNextDepartures(favorites);
+          startFavoritesPolling();
+        }
+      }
+    });
   }
 
   function initTabs() {
@@ -1910,6 +1956,7 @@ const App = (() => {
     TripAlarm.load();
     renderFavoriteChips();
     renderRecentSearches();
+    initVisibilityPause();
 
     departuresModeFilter = ModeFilter.create(
       document.getElementById('departures-mode-filter'),
