@@ -102,25 +102,52 @@ const API = (() => {
     },
 
     /**
-     * Nutzt unsere selbst gehostete OTP2-Instanz (VBB-Region) statt HAFAS.
-     * `from`/`to` brauchen nur noch { lat, lon, name } - egal ob Haltestelle,
-     * Adresse, POI oder GPS-Standort, alle liefern das bereits mit.
+     * Nutzt dieselbe HAFAS-Anbindung (VBB + Deutsche Bahn) wie die iOS-App.
+     * `from`/`to` brauchen { lat, lon, name }. `vias` ist eine Liste von bis
+     * zu 3 Zwischenhalten ({ lat, lon, name, waitMinutes }), in Reihenfolge
+     * der Route. Sobald mindestens ein Via gesetzt ist, verkettet das
+     * Backend mehrere Einzelabfragen - dann gelten immer "Abfahrt um" sowie
+     * feste results=1 pro Abschnitt, und earlierRef/laterRef liefern null
+     * zurück (siehe routes/journeys.js im Backend).
+     * `earlierRef`/`laterRef` laden, aus einer vorherigen Antwort übernommen,
+     * die nächste bzw. vorherige Seite an Verbindungen nach (ohne Vias).
+     * Gibt die volle Antwort zurück ({ journeys, earlierRef, laterRef }).
      */
-    getJourneys({ from, to, when, arrival, polylines, results = 5, transferSlack, wheelchair }) {
-      return request(
-        `/otp/journeys?${qs({
-          fromLat: from.lat,
-          fromLon: from.lon,
-          toLat: to.lat,
-          toLon: to.lon,
-          when: when || undefined,
-          arrival: arrival ? 'true' : undefined,
-          polylines: polylines ? 'true' : undefined,
-          results,
-          transferSlack,
-          wheelchair: wheelchair ? 'true' : undefined,
-        })}`,
-      );
+    getJourneys({
+      from, to, when, arrival, polylines, results = 5,
+      wheelchair, modes, bike, vias = [], earlierRef, laterRef,
+    }) {
+      const params = {
+        fromLat: from.lat,
+        fromLon: from.lon,
+        fromName: from.name || undefined,
+        toLat: to.lat,
+        toLon: to.lon,
+        toName: to.name || undefined,
+        results,
+        polylines: polylines ? 'true' : undefined,
+        accessibility: wheelchair ? 'true' : undefined,
+        modes: modes || undefined,
+        bike: bike ? 'true' : undefined,
+      };
+
+      if (earlierRef) {
+        params.earlierRef = earlierRef;
+      } else if (laterRef) {
+        params.laterRef = laterRef;
+      } else if (when) {
+        params.when = when;
+        if (arrival) params.arrival = 'true';
+      }
+
+      vias.slice(0, 3).forEach((via, i) => {
+        params[`via${i}Lat`] = via.lat;
+        params[`via${i}Lon`] = via.lon;
+        if (via.name) params[`via${i}Name`] = via.name;
+        if (via.waitMinutes) params[`via${i}WaitMinutes`] = via.waitMinutes;
+      });
+
+      return request(`/journeys?${qs(params)}`);
     },
 
     getFares() {

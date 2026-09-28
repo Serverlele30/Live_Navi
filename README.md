@@ -56,8 +56,9 @@ Ordnerinhalt auf einen Webserver (nginx, Apache, Vercel, o.ä.) legen.
 
 - **Abfahrten**: Live-Abfahrtstafel (VBB + echte DB-Bahnhöfe), Verkehrsmittel-Filter,
   Gleiswechsel-Hinweis, Störungen & Aufzugsstatus direkt unter der Tafel
-- **Route**: Routenplanung über eine selbst gehostete OTP2-Instanz, konfigurierbarer
-  Umstiegszeit-Puffer, rollstuhlgerechte Verbindungen, Route teilen (Link)
+- **Route**: Routenplanung über HAFAS (VBB + Deutsche Bahn, dieselbe Anbindung wie die
+  iOS-App), bis zu 3 Zwischenhalte, Verkehrsmittel-Filter, Fahrrad-Option,
+  rollstuhlgerechte Verbindungen, Früher/Später-Nachladen, Route teilen (Link)
 - **Karte**: Live-Fahrzeugpositionen, Fahrt isolieren/verfolgen, display-breite
   Darstellung auf jeder Bildschirmgröße
 - **Favoriten**: eigener Tab, Live-Vorschau der nächsten Abfahrt, Störungs-Badges

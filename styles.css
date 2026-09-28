@@ -1426,22 +1426,78 @@ button:active { transform: translateY(1px); }
 .journey-options-row { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
 .journey-options-row .mode-filter { margin-bottom: 0; }
 
-.transfer-slack-field { display: flex; flex-direction: column; gap: 5px; }
-.transfer-slack-field label {
+.journey-vias { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 8px; }
+.journey-via-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.journey-input-marker--via { color: var(--ink-muted); }
+.journey-via-row__fields {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.journey-via-row__search { position: relative; flex: 1; min-width: 160px; }
+.journey-via-row__search input {
+  width: 100%;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+}
+.journey-via-wait { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
+.journey-via-wait select {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 12px;
+}
+.journey-via-remove {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-muted);
+  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.journey-via-remove:hover { color: var(--signal-red); border-color: var(--signal-red); }
+.journey-add-via { margin: 0 0 12px; }
+
+.journey-modes-field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
+.journey-modes-field__label {
   color: var(--ink-muted);
   font: 600 10px var(--font-label);
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
-.transfer-slack-field select {
+.journey-modes-field .mode-filter { margin-bottom: 0; }
+
+.journey-load-more-row { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; }
+.journey-load-more-btn {
+  flex: 1;
   background: var(--panel);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-family: inherit;
+  border-radius: 999px;
+  padding: 9px 12px;
   font-size: 13px;
+  cursor: pointer;
 }
+.journey-load-more-btn:disabled { opacity: 0.4; cursor: default; }
+.journey-load-more-btn:not(:disabled):hover { border-color: var(--signal-amber); color: var(--signal-amber); }
+
 .journey-submit { min-height: 38px; padding: 9px 15px; }
 .journey-submit span { margin-left: 6px; }
 .journey-card { padding: 16px; }
@@ -2161,7 +2217,8 @@ button:active { transform: translateY(1px); }
   .journey-options-row { display: block; }
   .journey-options-row .journey-submit { width: 100%; margin-top: 8px; }
   .journey-options-row .mode-filter { margin-bottom: 8px; }
-  .transfer-slack-field select { width: 100%; }
+  .journey-via-row__fields { flex-direction: column; align-items: stretch; }
+  .journey-via-wait select { width: 100%; }
   .mobile-nav {
     display: block; position: fixed; bottom: 0; left: 0; right: 0;
     /* Muss über der (jetzt display-breiten) Live-Karte liegen - Leaflet nutzt

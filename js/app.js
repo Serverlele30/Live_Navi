@@ -3,18 +3,24 @@ const App = (() => {
   const LAST_STOP_KEY = 'oepnv-navi:db-last-stop';
   const RECENT_SEARCHES_KEY = 'oepnv-navi:db-recent-searches';
   const SEEN_DISRUPTIONS_KEY = 'oepnv-navi:db-seen-disruptions';
-  const TRANSFER_SLACK_KEY = 'oepnv-navi:db-transfer-slack';
   const WHEELCHAIR_KEY = 'oepnv-navi:db-wheelchair';
+  const BIKE_KEY = 'oepnv-navi:db-bike';
   const FAVORITES_POLL_MS = 30000;
+  const MAX_VIAS = 3;
+  const VIA_WAIT_OPTIONS = [0, 5, 10, 15, 20, 30, 45, 60];
 
   let currentStop = null;
   let departuresPollHandle = null;
   let departuresModeFilter = null;
+  let journeyModeFilter = null;
   let favoritesPollHandle = null;
 
   let journeyFrom = null;
   let journeyTo = null;
   let journeyArrivalMode = false;
+  let journeyVias = []; // { lat, lon, name, waitMinutes }
+  let journeyEarlierRef = null;
+  let journeyLaterRef = null;
   let lastJourneyParams = null;
   let remarksLoadedOnce = false;
 
@@ -1185,23 +1191,21 @@ const App = (() => {
     setupJourneyInput('journey-from', (loc) => (journeyFrom = loc));
     setupJourneyInput('journey-to', (loc) => (journeyTo = loc));
 
-    // Zuletzt gewählten Umstiegszeit-Puffer wiederherstellen, damit die
-    // Einstellung nicht bei jedem Besuch neu gesetzt werden muss.
-    const transferSlackSelect = document.getElementById('journey-transfer-slack');
-    if (transferSlackSelect) {
-      const saved = localStorage.getItem(TRANSFER_SLACK_KEY);
-      if (saved !== null) transferSlackSelect.value = saved;
-      transferSlackSelect.addEventListener('change', () => {
-        localStorage.setItem(TRANSFER_SLACK_KEY, transferSlackSelect.value);
-      });
-    }
-
     // Ebenso für "nur rollstuhlgerechte Verbindungen".
     const wheelchairToggle = document.getElementById('journey-wheelchair');
     if (wheelchairToggle) {
       wheelchairToggle.checked = localStorage.getItem(WHEELCHAIR_KEY) === 'true';
       wheelchairToggle.addEventListener('change', () => {
         localStorage.setItem(WHEELCHAIR_KEY, wheelchairToggle.checked ? 'true' : 'false');
+      });
+    }
+
+    // Ebenso für "Fahrrad mitnehmen".
+    const bikeToggle = document.getElementById('journey-bike');
+    if (bikeToggle) {
+      bikeToggle.checked = localStorage.getItem(BIKE_KEY) === 'true';
+      bikeToggle.addEventListener('change', () => {
+        localStorage.setItem(BIKE_KEY, bikeToggle.checked ? 'true' : 'false');
       });
     }
 
@@ -1228,6 +1232,135 @@ const App = (() => {
 
     const shareBtn = document.getElementById('journey-share-btn');
     if (shareBtn) shareBtn.addEventListener('click', shareCurrentJourney);
+
+    const addViaBtn = document.getElementById('journey-add-via');
+    if (addViaBtn) addViaBtn.addEventListener('click', addJourneyVia);
+    renderJourneyVias();
+
+    const earlierBtn = document.getElementById('journey-earlier-btn');
+    const laterBtn = document.getElementById('journey-later-btn');
+    if (earlierBtn) earlierBtn.addEventListener('click', () => loadAdjacentJourneys('earlier'));
+    if (laterBtn) laterBtn.addEventListener('click', () => loadAdjacentJourneys('later'));
+  }
+
+  // ---------- Zwischenhalte (Vias) ----------
+  //
+  // Bis zu MAX_VIAS Zwischenhalte, analog zur iOS-App. Das Backend verkettet
+  // dafür intern mehrere HAFAS-Einzelabfragen (siehe routes/journeys.js) -
+  // sobald mindestens ein Via gesetzt ist, gelten serverseitig immer
+  // "Abfahrt um" und es gibt keine Früher/Später-Buttons mehr.
+  function addJourneyVia() {
+    if (journeyVias.length >= MAX_VIAS) {
+      showToast(I18N.t('journey.maxViasReached'), 'warning');
+      return;
+    }
+    journeyVias.push({ lat: null, lon: null, name: '', waitMinutes: 0 });
+    renderJourneyVias();
+  }
+
+  function removeJourneyVia(index) {
+    journeyVias.splice(index, 1);
+    renderJourneyVias();
+  }
+
+  function renderJourneyVias() {
+    const container = document.getElementById('journey-vias');
+    if (!container) return;
+    container.innerHTML = '';
+
+    journeyVias.forEach((via, index) => {
+      const row = document.createElement('div');
+      row.className = 'journey-via-row';
+
+      const waitOptionsHtml = VIA_WAIT_OPTIONS
+        .map((m) => `<option value="${m}">${m === 0 ? escapeHtml(I18N.t('journey.viaWaitDirect')) : `${m} min`}</option>`)
+        .join('');
+
+      row.innerHTML = `
+        <span class="journey-input-marker journey-input-marker--via" aria-hidden="true"></span>
+        <div class="journey-via-row__fields">
+          <div class="journey-via-row__search">
+            <input type="text" class="journey-via-input" placeholder="${escapeHtml(I18N.t('journey.viaPlaceholder', { n: index + 1 }))}" autocomplete="off" value="${escapeHtml(via.name || '')}" />
+            <div class="search-results" hidden></div>
+          </div>
+          <label class="journey-via-wait">
+            <span>${escapeHtml(I18N.t('journey.viaWaitLabel'))}</span>
+            <select>${waitOptionsHtml}</select>
+          </label>
+        </div>
+        <button type="button" class="journey-via-remove" aria-label="${escapeHtml(I18N.t('journey.removeVia'))}">✕</button>
+      `;
+
+      const input = row.querySelector('.journey-via-input');
+      const resultsEl = row.querySelector('.search-results');
+      setupLocationAutocomplete(input, resultsEl, (loc) => {
+        journeyVias[index] = {
+          ...journeyVias[index],
+          lat: loc.latitude,
+          lon: loc.longitude,
+          name: loc.name,
+        };
+        input.value = loc.name;
+        resultsEl.hidden = true;
+      });
+
+      const waitSelect = row.querySelector('select');
+      waitSelect.value = String(via.waitMinutes || 0);
+      waitSelect.addEventListener('change', () => {
+        journeyVias[index] = { ...journeyVias[index], waitMinutes: parseInt(waitSelect.value, 10) || 0 };
+      });
+
+      row.querySelector('.journey-via-remove').addEventListener('click', () => removeJourneyVia(index));
+
+      container.appendChild(row);
+    });
+
+    const addBtn = document.getElementById('journey-add-via');
+    if (addBtn) addBtn.hidden = journeyVias.length >= MAX_VIAS;
+  }
+
+  // ---------- Früher / Später ----------
+  //
+  // Lädt die vorherige bzw. nächste Seite an Verbindungen nach, mit der
+  // Referenz aus der vorherigen Antwort - ohne Vias verfügbar (siehe
+  // routes/journeys.js).
+  async function loadAdjacentJourneys(direction) {
+    if (!lastJourneyParams) return;
+    const resultsEl = document.getElementById('journey-results');
+    const earlierBtn = document.getElementById('journey-earlier-btn');
+    const laterBtn = document.getElementById('journey-later-btn');
+
+    const params = {
+      ...lastJourneyParams,
+      earlierRef: direction === 'earlier' ? journeyEarlierRef : undefined,
+      laterRef: direction === 'later' ? journeyLaterRef : undefined,
+    };
+
+    if (earlierBtn) earlierBtn.disabled = true;
+    if (laterBtn) laterBtn.disabled = true;
+
+    try {
+      const response = await API.getJourneys(params);
+      lastJourneyParams = params;
+      journeyEarlierRef = response.earlierRef || null;
+      journeyLaterRef = response.laterRef || null;
+      renderJourneys(response.journeys, resultsEl);
+      updateJourneyLoadMoreButtons();
+    } catch (err) {
+      showToast(err.message, 'warning');
+      if (earlierBtn) earlierBtn.disabled = !journeyEarlierRef;
+      if (laterBtn) laterBtn.disabled = !journeyLaterRef;
+    }
+  }
+
+  function updateJourneyLoadMoreButtons() {
+    const row = document.getElementById('journey-load-more-row');
+    const earlierBtn = document.getElementById('journey-earlier-btn');
+    const laterBtn = document.getElementById('journey-later-btn');
+    const hasRefs = !!(journeyEarlierRef || journeyLaterRef);
+    if (row) row.hidden = !hasRefs;
+    if (earlierBtn) earlierBtn.disabled = !journeyEarlierRef;
+    if (laterBtn) laterBtn.disabled = !journeyLaterRef;
   }
 
   // Setzt "Jetzt/Abfahrt um/Ankunft um" programmatisch (Klick-Handler UND
@@ -1265,22 +1398,30 @@ const App = (() => {
     if (shareRow) shareRow.hidden = true;
 
     const whenInput = document.getElementById('journey-when').value;
-    const transferSlackSelect = document.getElementById('journey-transfer-slack');
     const wheelchairToggle = document.getElementById('journey-wheelchair');
+    const bikeToggle = document.getElementById('journey-bike');
+    const validVias = journeyVias.filter((v) => v.lat != null && v.lon != null);
     const params = {
       from: journeyFrom,
       to: journeyTo,
       when: whenInput || undefined,
       arrival: journeyArrivalMode,
       results: 5,
-      transferSlack: transferSlackSelect && transferSlackSelect.value !== '' ? transferSlackSelect.value : undefined,
       wheelchair: wheelchairToggle ? wheelchairToggle.checked : false,
+      bike: bikeToggle ? bikeToggle.checked : false,
+      modes: journeyModeFilter ? journeyModeFilter.getModesParam() : undefined,
+      vias: validVias,
     };
     lastJourneyParams = params;
+    journeyEarlierRef = null;
+    journeyLaterRef = null;
 
     try {
-      const { journeys } = await API.getJourneys(params);
-      renderJourneys(journeys, resultsEl);
+      const response = await API.getJourneys(params);
+      journeyEarlierRef = response.earlierRef || null;
+      journeyLaterRef = response.laterRef || null;
+      renderJourneys(response.journeys, resultsEl);
+      updateJourneyLoadMoreButtons();
       if (shareRow) shareRow.hidden = false;
     } catch (err) {
       resultsEl.innerHTML = `
@@ -1289,6 +1430,7 @@ const App = (() => {
           <button id="journey-retry" class="text-button" type="button">${escapeHtml(I18N.t('common.retry'))}</button>
         </div>
       `;
+      updateJourneyLoadMoreButtons();
       const retryBtn = document.getElementById('journey-retry');
       if (retryBtn) retryBtn.addEventListener('click', () => runJourneySearch());
     }
@@ -1310,8 +1452,8 @@ const App = (() => {
     const toName = journeyTo.name === 'Mein Standort' ? 'Startpunkt' : journeyTo.name;
 
     const whenInput = document.getElementById('journey-when').value;
-    const transferSlackSelect = document.getElementById('journey-transfer-slack');
     const wheelchairToggle = document.getElementById('journey-wheelchair');
+    const bikeToggle = document.getElementById('journey-bike');
 
     const params = new URLSearchParams({
       route: '1',
@@ -1324,8 +1466,20 @@ const App = (() => {
       arrival: journeyArrivalMode ? '1' : '0',
     });
     if (whenInput) params.set('when', whenInput);
-    if (transferSlackSelect && transferSlackSelect.value !== '') params.set('transferSlack', transferSlackSelect.value);
     if (wheelchairToggle && wheelchairToggle.checked) params.set('wheelchair', '1');
+    if (bikeToggle && bikeToggle.checked) params.set('bike', '1');
+    if (journeyModeFilter) {
+      const modes = journeyModeFilter.getModesParam();
+      if (modes) params.set('modes', modes);
+    }
+    journeyVias
+      .filter((v) => v.lat != null && v.lon != null)
+      .forEach((via, i) => {
+        params.set(`via${i}Lat`, via.lat);
+        params.set(`via${i}Lon`, via.lon);
+        if (via.name) params.set(`via${i}Name`, via.name);
+        if (via.waitMinutes) params.set(`via${i}Wait`, via.waitMinutes);
+      });
 
     return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
   }
@@ -1379,12 +1533,25 @@ const App = (() => {
     const whenValue = params.get('when') || '';
     setWhenChoice(params.get('arrival') === '1' ? 'arrival' : (whenValue ? 'departure' : 'now'), whenValue);
 
-    const transferSlackParam = params.get('transferSlack');
-    const transferSlackSelect = document.getElementById('journey-transfer-slack');
-    if (transferSlackSelect && transferSlackParam) transferSlackSelect.value = transferSlackParam;
-
     const wheelchairToggle = document.getElementById('journey-wheelchair');
     if (wheelchairToggle) wheelchairToggle.checked = params.get('wheelchair') === '1';
+
+    const bikeToggle = document.getElementById('journey-bike');
+    if (bikeToggle) bikeToggle.checked = params.get('bike') === '1';
+
+    journeyVias = [];
+    for (let i = 0; i < MAX_VIAS; i++) {
+      const viaLat = parseFloat(params.get(`via${i}Lat`));
+      const viaLon = parseFloat(params.get(`via${i}Lon`));
+      if (Number.isNaN(viaLat) || Number.isNaN(viaLon)) continue;
+      journeyVias.push({
+        lat: viaLat,
+        lon: viaLon,
+        name: params.get(`via${i}Name`) || '',
+        waitMinutes: parseInt(params.get(`via${i}Wait`), 10) || 0,
+      });
+    }
+    renderJourneyVias();
 
     activateTab('journey');
     runJourneySearch();
@@ -1393,6 +1560,15 @@ const App = (() => {
   function setupJourneyInput(inputId, onSelect) {
     const input = document.getElementById(inputId);
     const results = document.getElementById(`${inputId}-results`);
+    setupLocationAutocomplete(input, results, (loc) => {
+      onSelect({ id: loc.id || undefined, lat: loc.latitude, lon: loc.longitude, name: loc.name, kind: loc.kind });
+    });
+  }
+
+  // Wiederverwendbare Haltestellen-/Adress-Autovervollständigung. Wird für
+  // Start/Ziel (feste IDs im DOM) UND für dynamisch erzeugte
+  // Zwischenhalt-Zeilen genutzt (siehe renderJourneyVias()).
+  function setupLocationAutocomplete(input, results, onSelect) {
     let debounce = null;
     let requestId = 0;
     wireSearchKeyboardNav(input, results);
@@ -1410,7 +1586,7 @@ const App = (() => {
           const { locations } = await API.searchLocations(query);
           if (thisRequestId !== requestId) return; // veraltete Antwort, verwerfen
           renderSearchResults(results, locations, (loc) => {
-            onSelect({ id: loc.id || undefined, lat: loc.latitude, lon: loc.longitude, name: loc.name, kind: loc.kind });
+            onSelect(loc);
             input.value = loc.name;
             results.hidden = true;
           });
@@ -1421,7 +1597,7 @@ const App = (() => {
     });
 
     document.addEventListener('click', (e) => {
-      if (!e.target.closest(`#${inputId}`) && !e.target.closest(`#${inputId}-results`)) {
+      if (e.target !== input && !results.contains(e.target)) {
         results.hidden = true;
       }
     });
@@ -1606,6 +1782,12 @@ const App = (() => {
       () => {},
     );
     LiveMap.setModeFilter(() => mapModeFilter.getModesParam());
+
+    journeyModeFilter = ModeFilter.create(
+      document.getElementById('journey-mode-filter'),
+      'oepnv-navi:modes:journey',
+      () => {},
+    );
     document.getElementById('map-locate').addEventListener('click', () => LiveMap.locateUser());
     document.getElementById('map-isolation-reset').addEventListener('click', () => LiveMap.clearIsolation());
 

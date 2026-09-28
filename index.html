@@ -130,29 +130,35 @@
         <button class="when-choice" data-when="arrival" type="button" aria-pressed="false" data-i18n="journey.arrivalAt">Ankunft um</button>
         <input type="datetime-local" id="journey-when" class="journey-datetime" aria-label="Datum und Uhrzeit" hidden />
       </div>
+      <div id="journey-vias" class="journey-vias"></div>
+      <button id="journey-add-via" class="text-button journey-add-via" type="button">+ <span data-i18n="journey.addVia">Zwischenhalt hinzufügen</span></button>
+
       <label class="wheelchair-toggle">
         <input type="checkbox" id="journey-wheelchair" />
         <span><span aria-hidden="true">♿</span> <span data-i18n="journey.wheelchair">Nur rollstuhlgerechte Verbindungen</span></span>
       </label>
+      <label class="wheelchair-toggle" id="journey-bike-row">
+        <input type="checkbox" id="journey-bike" />
+        <span><span aria-hidden="true">🚲</span> <span data-i18n="journey.bike">Fahrrad mitnehmen</span></span>
+      </label>
+
+      <div class="journey-modes-field" id="journey-modes-field">
+        <span class="journey-modes-field__label" data-i18n="journey.modes">Verkehrsmittel</span>
+        <div id="journey-mode-filter" class="mode-filter"></div>
+      </div>
+
       <div class="journey-options-row">
-        <div class="transfer-slack-field">
-          <label for="journey-transfer-slack" data-i18n="journey.transferSlack">Umstiegszeit-Puffer</label>
-          <select id="journey-transfer-slack">
-            <option value="" data-i18n="journey.transferSlackDefault">Standard</option>
-            <option value="0" data-i18n="journey.transferSlack0">0 min (knapp)</option>
-            <option value="3">3 min</option>
-            <option value="5">5 min</option>
-            <option value="10">10 min</option>
-            <option value="15" data-i18n="journey.transferSlack15">15 min (sicher)</option>
-          </select>
-        </div>
         <button id="journey-submit" class="journey-submit" type="button"><span data-i18n="journey.submit">Verbindungen suchen</span> <span aria-hidden="true">→</span></button>
       </div>
-      <p class="journey-source-note" data-i18n="journey.sourceNote">🛰 Routenplanung über unsere selbst gehostete, offene Instanz (VBB-Region)</p>
+      <p class="journey-source-note" data-i18n="journey.sourceNote">🛰 Routenplanung mit Echtzeitdaten von VBB &amp; Deutscher Bahn</p>
       <div id="journey-share-row" class="journey-share-row" hidden>
         <button id="journey-share-btn" class="text-button" type="button"><span aria-hidden="true">🔗</span> <span data-i18n="journey.share">Route teilen</span></button>
       </div>
       <div id="journey-results" class="journey-results" aria-live="polite"></div>
+      <div id="journey-load-more-row" class="journey-load-more-row" hidden>
+        <button id="journey-earlier-btn" class="journey-load-more-btn" type="button" disabled>↑ <span data-i18n="journey.earlier">Früher</span></button>
+        <button id="journey-later-btn" class="journey-load-more-btn" type="button" disabled>↓ <span data-i18n="journey.later">Später</span></button>
+      </div>
     </section>
 
     <section class="tab-panel" data-tab-panel="nearby" hidden>
