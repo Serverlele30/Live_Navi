@@ -21,9 +21,9 @@
   --font-body: 'IBM Plex Sans', -apple-system, sans-serif;
   --font-label: 'IBM Plex Sans Condensed', sans-serif;
 
-  --radius: 10px;
-  --radius-lg: 18px;
-  --header-height: 64px;
+  --radius: 13px;
+  --radius-lg: 22px;
+  --header-height: 68px;
 
   --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.22);
   --shadow-md: 0 10px 26px rgba(0, 0, 0, 0.32);
@@ -155,9 +155,26 @@ button {
 .brand {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 18px;
-  letter-spacing: 0.06em;
+  font-size: 20px;
+  letter-spacing: 0.04em;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand::before {
+  content: '🚏';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  font-size: 15px;
+  background: linear-gradient(155deg, #ffc158, var(--signal-amber) 65%);
+  box-shadow: var(--shadow-glow-amber);
 }
 
 .brand__mark {
@@ -396,18 +413,6 @@ button {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Ab hier: großzügigere Nutzung des Platzes auf breiten Bildschirmen -
-   Mobile bleibt die Grundlage (Layout unten bricht bei 700px zusammen),
-   aber die Karten-Raster sollen auf dem Desktop nicht wie eine einzelne
-   schmale Spalte in der Mitte wirken. */
-@media (min-width: 960px) {
-  .app-main { max-width: 900px; padding: 32px 24px 48px; }
-  .favorite-cards { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
-  .more-grid { grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
-  .nearby-preview { grid-template-columns: repeat(4, minmax(0,1fr)); }
-  .welcome-panel p { max-width: 560px; }
-  .journey-card-form { padding: 18px 22px; }
-}
 
 /* ============================================================
    Abfahrtstafel (Signature-Element)
@@ -1168,7 +1173,6 @@ button:active { transform: translateY(1px); }
   border: 0;
   background: transparent;
   padding: 0;
-  font: inherit;
 }
 .search-box--global { max-width: 620px; }
 .search-box--global input { padding: 12px 42px 12px 42px; font-size: 15px; }
@@ -1229,16 +1233,43 @@ button:active { transform: translateY(1px); }
 }
 
 .favorites-bar { display: none; }
+
+/* Segmentierte Pill-Navigation statt schlichter Unterstreichung - der aktive
+   Tab bekommt einen vollen Amber-Verlauf-Hintergrund (dieselbe Formsprache
+   wie der primäre Such-Button), statt nur eine andere Textfarbe zu haben. */
 .tab-nav {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--line);
+  padding: 14px 20px;
+  border-bottom: none;
 }
-.tab-button { padding: 14px 18px; display: inline-flex; gap: 8px; align-items: center; }
-.tab-button__icon { filter: grayscale(.35); }
+.tab-nav__list {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px;
+}
+.tab-button {
+  padding: 10px 18px;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  border-radius: 999px;
+  border-bottom: none;
+  transition: background .18s ease, color .18s ease, box-shadow .18s ease;
+}
+.tab-button__icon { filter: grayscale(.35); transition: filter .18s ease; }
+.tab-button:hover:not(.is-active) { color: var(--ink); }
+.tab-button.is-active {
+  background: linear-gradient(155deg, #ffc158, var(--signal-amber) 65%);
+  color: #1a1206;
+  box-shadow: var(--shadow-glow-amber);
+}
+.tab-button.is-active .tab-button__icon { filter: none; }
 
-.app-main { max-width: 920px; padding: 30px 20px 50px; }
+.app-main { max-width: 960px; padding: 30px 20px 50px; }
 
 .welcome-panel {
   padding: 28px;
@@ -1454,8 +1485,9 @@ button:active { transform: translateY(1px); }
 }
 .favorite-toggle { padding: 8px 12px; }
 
-.flap-row { grid-template-columns: 82px minmax(0,1fr) 82px 112px; padding: 14px 16px 14px 13px; }
-.flap-cell--time { font-size: 17px; }
+.flap-row { grid-template-columns: 82px minmax(0,1fr) 82px 118px; padding: 16px 18px 16px 15px; border-left-width: 5px; }
+.flap-cell--time { font-size: 21px; letter-spacing: -.01em; }
+.flap-cell--line { font-size: 17px; padding: 6px 10px; }
 .flap-cell--direction { font-size: 15px; font-weight: 600; }
 .flap-cell--platform { font-size: 14px; }
 .station-disruption { background: rgba(255,93,108,.08); border: 1px solid rgba(255,93,108,.3); color: var(--ink); border-radius: 9px; padding: 12px; margin-top: 14px; font-size: 12px; }
@@ -1593,6 +1625,17 @@ button:active { transform: translateY(1px); }
 .more-card > span { grid-row: span 2; font-size: 23px; }
 .more-card small { color: var(--ink-muted); font-size: 12px; }
 .more-card:hover { border-color: var(--signal-amber); }
+
+/* Breitere Bildschirme sollen die Karten-Raster wirklich nutzen, statt wie
+   eine schmale Spalte in der Mitte zu wirken. */
+@media (min-width: 960px) {
+  .favorite-cards { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+  .more-grid { grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+  .nearby-preview { grid-template-columns: repeat(4, minmax(0,1fr)); }
+  .welcome-panel p { max-width: 560px; }
+  .journey-card-form { padding: 18px 22px; }
+}
+
 .recent-section { margin-top: 28px; }
 .recent-searches { display: flex; flex-wrap: wrap; gap: 8px; }
 .recent-item {
@@ -2363,9 +2406,10 @@ html.simple-mode .when-choice { min-height: 46px; }
 }
 
 @media (max-width: 700px) {
-  body { padding-bottom: 66px; }
+  body { padding-bottom: 84px; }
   .app-header { height: auto; min-height: 64px; padding: 10px 12px; gap: 8px; }
-  .brand { font-size: 15px; }
+  .brand { font-size: 15px; gap: 7px; }
+  .brand::before { width: 24px; height: 24px; border-radius: 7px; font-size: 12px; }
   .search-box--global { min-width: 0; }
   .search-box--global input { font-size: 14px; padding: 10px 38px; }
   .header-icon-btn { width: 34px; height: 34px; font-size: 15px; }
@@ -2376,31 +2420,50 @@ html.simple-mode .when-choice { min-height: 46px; }
   .favorite-cards, .nearby-preview, .more-grid { grid-template-columns: 1fr; }
   .board-header { align-items: flex-start; }
   .board-station-name { font-size: 20px; }
-  .flap-row { grid-template-columns: 64px minmax(0,1fr) 58px 82px; gap: 14px; padding: 11px 10px; }
+  .flap-row { grid-template-columns: 60px minmax(0,1fr) 54px 78px; gap: 12px; padding: 12px 12px 12px 10px; border-left-width: 4px; }
   .flap-label { font-size: 9px; }
   .flap-cell--direction { font-size: 12px; }
   .flap-cell--platform { font-size: 12px; }
-  .flap-cell--time { font-size: 14px; }
+  .flap-cell--line { font-size: 14px; padding: 4px 8px; }
+  .flap-cell--time { font-size: 17px; letter-spacing: -.01em; }
   .journey-options-row { display: block; }
   .journey-options-row .journey-submit { width: 100%; margin-top: 8px; }
   .journey-options-row .mode-filter { margin-bottom: 8px; }
   .journey-via-row__fields { flex-direction: column; align-items: stretch; }
   .journey-via-wait select { width: 100%; }
+  /* Freischwebende Glas-Leiste statt einer am Rand klebenden Balken -
+     abgesetzt vom Bildschirmrand, mit Weichzeichner-Hintergrund wie der
+     Header/die Toasts, damit sie wie eine eigene Ebene über dem Inhalt
+     wirkt statt wie ein angeklebtes Steuerelement. */
   .mobile-nav {
-    display: block; position: fixed; bottom: 0; left: 0; right: 0;
+    display: block; position: fixed; left: 10px; right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
     /* Muss über der (jetzt display-breiten) Live-Karte liegen - Leaflet nutzt
        für seine eigenen Steuerelemente (Zoom-Buttons etc.) intern z-index-
        Werte bis ~1000, das HUD/die Navigation soll aber immer sichtbar und
        bedienbar bleiben, unabhängig von der Karte. */
-    z-index: 1100; background: rgba(23,30,38,.97); border-top: 1px solid var(--line); padding: 5px 4px calc(5px + env(safe-area-inset-bottom));
+    z-index: 1100;
+    background: rgba(20, 26, 33, 0.82);
+    backdrop-filter: blur(18px) saturate(1.4);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    box-shadow: var(--shadow-lg);
+    padding: 6px 4px;
   }
   .mobile-nav__list { display: grid; grid-template-columns: repeat(6, 1fr); }
-  .mobile-nav__item { border: 0; background: transparent; color: var(--ink-muted); padding: 5px 1px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .mobile-nav__item {
+    position: relative;
+    border: 0; background: transparent; color: var(--ink-muted);
+    padding: 7px 1px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    border-radius: 14px;
+    transition: color .15s ease, background .15s ease;
+  }
   .mobile-nav__item span { font-size: 16px; line-height: 1.1; }
   .mobile-nav__item small { font-size: 8.5px; }
-  .mobile-nav__item.is-active { color: var(--signal-amber); }
-  .toast-container { bottom: calc(64px + env(safe-area-inset-bottom) + 12px); }
-  .global-disclaimer { padding-bottom: calc(28px + 64px + env(safe-area-inset-bottom)); }
+  .mobile-nav__item.is-active { color: var(--signal-amber); background: var(--signal-amber-soft); }
+  .toast-container { bottom: calc(66px + env(safe-area-inset-bottom) + 20px); }
+  .global-disclaimer { padding-bottom: calc(28px + 66px + env(safe-area-inset-bottom) + 20px); }
 }
 
 @media (max-width: 430px) {
