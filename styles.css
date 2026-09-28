@@ -35,6 +35,22 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+  /* Dezenter, zum Theme passender Scrollbalken statt der grauen Standard-
+     Balken - vor allem auf Desktop mit sichtbarer Maus-Scrollbar spürbar. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-overlay) transparent;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--panel-overlay);
+  border-radius: 999px;
+  border: 2px solid var(--bg-void);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--line); }
+
 html, body {
   margin: 0;
   padding: 0;
@@ -366,6 +382,29 @@ button {
   max-width: 720px;
   margin: 0 auto;
   padding: 20px;
+}
+
+/* Dezentes Einblenden beim Tab-Wechsel, statt dass der Inhalt hart
+   "springt" - Animation läuft erneut, sobald [hidden] entfernt wird. */
+.tab-panel:not([hidden]) {
+  animation: panel-fade-in .22s ease both;
+}
+@keyframes panel-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Ab hier: großzügigere Nutzung des Platzes auf breiten Bildschirmen -
+   Mobile bleibt die Grundlage (Layout unten bricht bei 700px zusammen),
+   aber die Karten-Raster sollen auf dem Desktop nicht wie eine einzelne
+   schmale Spalte in der Mitte wirken. */
+@media (min-width: 960px) {
+  .app-main { max-width: 900px; padding: 32px 24px 48px; }
+  .favorite-cards { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+  .more-grid { grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+  .nearby-preview { grid-template-columns: repeat(4, minmax(0,1fr)); }
+  .welcome-panel p { max-width: 560px; }
+  .journey-card-form { padding: 18px 22px; }
 }
 
 /* ============================================================
@@ -757,6 +796,12 @@ button {
   border-radius: var(--radius);
   padding: 14px;
   margin-bottom: 10px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.journey-card:hover {
+  border-color: rgba(245, 166, 35, 0.35);
+  box-shadow: var(--shadow-md);
 }
 
 .journey-leg {
@@ -821,12 +866,16 @@ button {
   letter-spacing: 0.02em;
 }
 
+.mode-chip { transition: border-color .15s ease, color .15s ease, background .15s ease; }
+.mode-chip:hover { border-color: var(--ink-muted); color: var(--ink); }
+
 .mode-chip.is-active {
   color: var(--signal-amber);
   border-color: var(--signal-amber);
   background: var(--signal-amber-soft);
   box-shadow: 0 0 0 1px rgba(245, 166, 35, 0.15);
 }
+.mode-chip.is-active:hover { border-color: var(--signal-amber); color: var(--signal-amber); }
 
 /* ============================================================
    Standort-Buttons
@@ -904,7 +953,10 @@ button {
   border-left: 3px solid var(--signal-red);
   border-radius: var(--radius);
   padding: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow .15s ease, transform .15s ease;
 }
+.remark-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
 
 /* Einheitliche "Meldungs"-Optik: Icon-Kreis + Textblock, dieselbe
    Formsprache wie die Toast-Benachrichtigungen. Wird für Störungen
@@ -1577,7 +1629,11 @@ button:active { transform: translateY(1px); }
   display: flex; align-items: flex-start; gap: 10px;
   background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
   padding: 12px 14px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+  animation: flap-row-in .25s ease both;
 }
+.notification-item:hover { border-color: rgba(245, 166, 35, 0.35); box-shadow: var(--shadow-md); transform: translateY(-1px); }
 .notification-item__icon { font-size: 18px; flex-shrink: 0; }
 .notification-item__body { flex: 1; min-width: 0; }
 .notification-item__body strong { display: block; font-size: 13px; }
