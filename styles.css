@@ -781,6 +781,53 @@ button {
   outline: 2px solid #e5484d;
   outline-offset: 2px;
 }
+.vehicle-popup { min-width: 190px; color: var(--ink); font-family: var(--font-body); }
+.vehicle-popup__heading {
+  margin-bottom: 8px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 800;
+}
+.vehicle-popup__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+.vehicle-popup__row span { color: var(--ink-muted); }
+.vehicle-popup__row strong { color: var(--ink); text-align: right; font-weight: 600; }
+.vehicle-popup__notice {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 8px;
+  padding: 8px;
+  border-left: 3px solid #e5484d;
+  background: rgba(229,72,77,.09);
+  font-size: 11px;
+}
+.vehicle-popup__notice strong { color: #c9363d; }
+.vehicle-popup__notice span { color: var(--ink-muted); }
+.vehicle-popup__track {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--signal-amber);
+  color: var(--on-amber);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.vehicle-popup__track:hover { filter: brightness(1.08); }
+
 .vehicle-marker__kontrolle {
   position: absolute;
   top: -8px;
