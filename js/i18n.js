@@ -51,6 +51,8 @@ const I18N = (() => {
       'freifahren.liveSameDirection': 'Die Richtungsangabe passt zur Fahrt.',
       'freifahren.liveOppositePossible': 'Andere Richtungsangabe als deine Fahrt – eine Begegnung ist möglich, aber nicht sicher vorhersagbar.',
       'freifahren.liveDirectionUnknown': 'Die Bewegungsrichtung lässt sich aus den Daten nicht sicher ableiten.',
+      'freifahren.routeNoMatch': 'FreiFahren geprüft · Keine passende Meldung an den Umstiegspunkten oder Linien gefunden.',
+      'freifahren.routeMatch': '{count} passende FreiFahren-Meldung(en): {details}',
     
       'nav.more': 'Mehr',
       'nav.settings': 'Einstellungen',
@@ -224,6 +226,8 @@ const I18N = (() => {
       'freifahren.liveSameDirection': 'The reported direction matches your trip.',
       'freifahren.liveOppositePossible': 'The reported direction differs from your trip – an encounter is possible, but cannot be predicted with certainty.',
       'freifahren.liveDirectionUnknown': 'Movement direction cannot be determined reliably from the data.',
+      'freifahren.routeNoMatch': 'FreiFahren checked · No matching report found at route stops or lines.',
+      'freifahren.routeMatch': '{count} matching FreiFahren report(s): {details}',
     
       'nav.more': 'More',
       'nav.settings': 'Settings',
