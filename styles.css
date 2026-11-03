@@ -763,6 +763,9 @@ button {
   box-shadow: inset 0 12px 24px -12px rgba(0,0,0,.6), inset 0 -12px 24px -12px rgba(0,0,0,.6);
 }
 
+.vehicle-marker {
+  position: relative;
+}
 .vehicle-marker span {
   display: inline-flex;
   align-items: center;
@@ -776,6 +779,26 @@ button {
   border-radius: var(--radius);
   white-space: nowrap;
   box-shadow: 0 0 0 2px var(--bg-void);
+}
+.vehicle-marker--freifahren span {
+  outline: 2px solid #e5484d;
+  outline-offset: 2px;
+}
+.vehicle-marker__kontrolle {
+  position: absolute;
+  top: -8px;
+  right: -9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--bg-void);
+  border-radius: 50%;
+  background: #e5484d;
+  color: #fff;
+  font: 800 9px/1 var(--font-display);
+  box-shadow: 0 1px 4px rgba(0,0,0,.35);
 }
 
 /* ============================================================
