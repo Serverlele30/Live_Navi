@@ -781,7 +781,27 @@ button {
   outline: 2px solid #e5484d;
   outline-offset: 2px;
 }
-.vehicle-popup { min-width: 190px; color: var(--ink); font-family: var(--font-body); }
+/* Leaflet-Popups folgen denselben Theme-Tokens wie der Rest der App. */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--panel) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-md);
+}
+.leaflet-popup-content-wrapper { border-radius: var(--radius-lg); }
+.leaflet-popup-content { margin: 14px 16px; }
+.leaflet-popup-close-button { color: var(--ink-muted) !important; }
+.leaflet-popup-close-button:hover { color: var(--ink) !important; }
+.vehicle-popup {
+  min-width: 190px;
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+.vehicle-popup__heading,
+.vehicle-popup__row strong { color: var(--ink); }
+.vehicle-popup__row span,
+.vehicle-popup__notice span { color: var(--ink-muted); }
 .vehicle-popup__heading {
   margin-bottom: 8px;
   padding-bottom: 7px;
