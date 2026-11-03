@@ -383,7 +383,7 @@ const LiveMap = (() => {
 
       if (marker) {
         marker.setLatLng([v.latitude, v.longitude]);
-        marker.setIcon(vehicleIcon(v.line, v.color, v.textColor, suspectedReport));
+        marker.setIcon(vehicleIcon(v.line, v.color, v.textColor, suspectedReport, v.tripId === currentTripId));
         marker.setPopupContent(popupHtml);
         marker._liveNaviVehicle = v;
       } else {
