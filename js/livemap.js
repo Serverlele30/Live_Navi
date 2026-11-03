@@ -12,6 +12,8 @@
 const LiveMap = (() => {
   let map = null;
   let radarLayer = null;
+  // Marker nach Fahrt-ID wiederverwenden, damit Live-Updates offene Popups nicht zerstören.
+  let radarMarkers = new Map();
   let routeLayer = null;
   let userLayer = null;
   let tripMarker = null;
@@ -230,19 +232,54 @@ const LiveMap = (() => {
     }
 
     await refreshFreifahrenMapReports();
-    radarLayer.clearLayers();
+    const visibleKeys = new Set();
     data.vehicles.forEach((v) => {
       if (v.latitude == null || v.longitude == null) return;
+
+      // Die Fahrt-ID bleibt bei Positionsänderungen stabil. Fallbacks helfen
+      // bei Datenquellen, die statt tripId eine Fahrzeug-ID liefern.
+      const markerKey = String(v.tripId || v.vehicleId || v.id || [
+        v.line || '', v.direction || '', v.nextStopover || '',
+      ].join('|'));
+      visibleKeys.add(markerKey);
+
       const suspectedReport = findVehicleFreifahrenReport(v);
-      const marker = L.marker([v.latitude, v.longitude], { icon: vehicleIcon(v.line, v.color, v.textColor, suspectedReport) });
-      marker.bindPopup(vehiclePopupHtml(v, suspectedReport, true), { maxWidth: 280 });
-      // Der Marker-Klick öffnet jetzt zuerst die Fahrzeuginformationen.
-      // Erst die Schaltfläche im Popup startet die isolierte Live-Verfolgung.
-      marker.on('popupopen', () => {
-        const button = marker.getPopup()?.getElement()?.querySelector('.vehicle-popup__track');
-        if (button) button.addEventListener('click', () => isolateVehicle(v), { once: true });
-      });
-      marker.addTo(radarLayer);
+      const popupHtml = vehiclePopupHtml(v, suspectedReport, true);
+      let marker = radarMarkers.get(markerKey);
+
+      if (marker) {
+        // setLatLng bewegt denselben Leaflet-Marker; ein geöffnetes Popup
+        // bleibt daran verankert und wandert mit dem Fahrzeug mit.
+        marker.setLatLng([v.latitude, v.longitude]);
+        marker.setIcon(vehicleIcon(v.line, v.color, v.textColor, suspectedReport));
+        marker.setPopupContent(popupHtml);
+        marker._liveNaviVehicle = v;
+      } else {
+        marker = L.marker([v.latitude, v.longitude], {
+          icon: vehicleIcon(v.line, v.color, v.textColor, suspectedReport),
+        });
+        marker.bindPopup(popupHtml, { maxWidth: 300, autoClose: false, closeOnClick: false });
+        marker._liveNaviVehicle = v;
+        marker.on('popupopen', () => {
+          const button = marker.getPopup()?.getElement()?.querySelector('.vehicle-popup__track');
+          if (button) button.addEventListener('click', () => {
+            const currentVehicle = marker._liveNaviVehicle;
+            if (currentVehicle) isolateVehicle(currentVehicle);
+          }, { once: true });
+        });
+        marker.addTo(radarLayer);
+        radarMarkers.set(markerKey, marker);
+      }
+    });
+
+    // Nur tatsächlich nicht mehr gelieferte Fahrten entfernen. Marker, die
+    // weiterhin gemeldet werden, werden oben lediglich aktualisiert.
+    radarMarkers.forEach((marker, key) => {
+      if (!visibleKeys.has(key)) {
+        if (map && marker.isPopupOpen()) map.closePopup(marker.getPopup());
+        radarLayer.removeLayer(marker);
+        radarMarkers.delete(key);
+      }
     });
   }
 
@@ -320,6 +357,7 @@ const LiveMap = (() => {
     currentTripId = vehicle.tripId;
     isolatedMarker = null;
     radarLayer.clearLayers();
+    radarMarkers.clear();
 
     isolatedVehicleMeta = { line: vehicle.line, color: vehicle.color, textColor: vehicle.textColor };
     updateIsolationBanner();
@@ -354,6 +392,7 @@ const LiveMap = (() => {
   function clearIsolation() {
     currentTripId = null;
     isolatedMarker = null;
+    radarMarkers.clear();
     isolatedVehicleMeta = null;
     updateIsolationBanner();
     startRadar();
