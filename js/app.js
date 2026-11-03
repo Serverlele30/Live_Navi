@@ -26,6 +26,9 @@ const App = (() => {
   let remarksLoadedOnce = false;
   let freifahrenLoadedOnce = false;
   let freifahrenLoading = false;
+  let freifahrenReportsCache = null;
+  let freifahrenReportsFetchedAt = 0;
+  let freifahrenReportsRequest = null;
 
   function loadFavorites() {
     try {
@@ -1182,8 +1185,8 @@ const App = (() => {
       loadNearbyDisruptions();
     }
 
-    if (tabName === 'disruptions' && !freifahrenLoadedOnce) {
-      loadFreifahrenReports();
+    if (tabName === 'freifahren' && !freifahrenLoadedOnce) {
+      loadFreifahrenPage();
     }
 
     if (tabName === 'fares' && !faresLoadedOnce) {
@@ -1377,26 +1380,47 @@ const App = (() => {
     });
   }
 
-  // ---------- FreiFahren-Meldungen ----------
+  // ---------- FreiFahren ----------
 
   function initFreifahrenReports() {
     const refreshButton = document.getElementById('freifahren-refresh');
-    if (!refreshButton) return;
-    refreshButton.addEventListener('click', () => {
-      freifahrenLoadedOnce = false;
-      loadFreifahrenReports();
-    });
+    if (refreshButton) {
+      refreshButton.addEventListener('click', () => loadFreifahrenPage(true));
+    }
   }
 
-  async function loadFreifahrenReports() {
+  async function fetchFreifahrenReports(force = false) {
+    if (force) {
+      freifahrenReportsCache = null;
+      freifahrenReportsFetchedAt = 0;
+    }
+    if (freifahrenReportsCache && Date.now() - freifahrenReportsFetchedAt < 60000) {
+      return freifahrenReportsCache;
+    }
+    if (freifahrenReportsRequest) return freifahrenReportsRequest;
+
+    freifahrenReportsRequest = API.getFreifahrenReports()
+      .then((data) => {
+        freifahrenReportsCache = data;
+        freifahrenReportsFetchedAt = Date.now();
+        return data;
+      })
+      .finally(() => { freifahrenReportsRequest = null; });
+    return freifahrenReportsRequest;
+  }
+
+  async function loadFreifahrenPage(force = false) {
     const container = document.getElementById('freifahren-reports-list');
     const meta = document.getElementById('freifahren-meta');
     if (!container || freifahrenLoading) return;
 
     freifahrenLoading = true;
-    container.innerHTML = '<div class="board-empty-state">FreiFahren-Meldungen werden geladen…</div>';
+    if (force) freifahrenLoadedOnce = false;
+    container.innerHTML = `<div class="board-empty-state board-loading"><span class="spinner" aria-hidden="true"></span> ${escapeHtml(I18N.t('freifahren.loading'))}</div>`;
+    if (meta) meta.textContent = I18N.t('freifahren.loading');
+
     try {
-      const data = await API.getFreifahrenReports();
+      const data = await fetchFreifahrenReports(force);
       const reports = Array.isArray(data.reports) ? data.reports : [];
       renderFreifahrenReports(reports, container);
 
@@ -1404,68 +1428,148 @@ const App = (() => {
       const fetchedLabel = fetchedAt && !Number.isNaN(fetchedAt.getTime())
         ? fetchedAt.toLocaleString(I18N.getLang() === 'en' ? 'en-GB' : 'de-DE')
         : '';
-      const city = data.city ? String(data.city) : '';
       const count = Number.isFinite(data.count) ? data.count : reports.length;
       if (meta) {
         meta.textContent = [
-          city,
-          count + (I18N.getLang() === 'en' ? ' reports' : ' Meldungen'),
-          fetchedLabel ? (I18N.getLang() === 'en' ? 'Updated: ' : 'Stand: ') + fetchedLabel : '',
+          data.city || '',
+          I18N.t('freifahren.count', { count }),
+          fetchedLabel ? I18N.t('freifahren.updated', { time: fetchedLabel }) : '',
         ].filter(Boolean).join(' · ');
       }
       freifahrenLoadedOnce = true;
     } catch (err) {
-      container.innerHTML = `<div class="board-error">⚠ ${escapeHtml(err.message || 'FreiFahren-Daten konnten nicht geladen werden.')}</div>`;
-      if (meta) meta.textContent = '';
+      container.innerHTML = `<div class="board-error">⚠ ${escapeHtml(err.message || I18N.t('freifahren.error'))}</div>`;
+      if (meta) meta.textContent = I18N.t('freifahren.error');
     } finally {
       freifahrenLoading = false;
     }
   }
 
+  function getFreifahrenReportDetails(report) {
+    const station = report.station && typeof report.station === 'object'
+      ? report.station.name
+      : report.station;
+    const lineObject = report.line && typeof report.line === 'object' ? report.line : null;
+    const line = lineObject ? (lineObject.name || lineObject.id || '') : (report.line || report.lineId || '');
+    const direction = report.direction && typeof report.direction === 'object'
+      ? (report.direction.name || report.direction.label || '')
+      : (report.direction || '');
+    const expiresAt = report.expiresAt ? new Date(report.expiresAt) : null;
+    const expiry = expiresAt && !Number.isNaN(expiresAt.getTime())
+      ? I18N.t('freifahren.validUntil', { time: expiresAt.toLocaleString(I18N.getLang() === 'en' ? 'en-GB' : 'de-DE') })
+      : '';
+    const timestamp = report.timestamp ? new Date(report.timestamp) : null;
+    const reportedAt = timestamp && !Number.isNaN(timestamp.getTime())
+      ? timestamp.toLocaleString(I18N.getLang() === 'en' ? 'en-GB' : 'de-DE')
+      : '';
+    return { station: station || '', line: line || '', direction: direction || '', expiry, reportedAt, lineColor: lineObject && /^#[0-9a-f]{6}$/i.test(lineObject.color || '') ? lineObject.color : '' };
+  }
+
   function renderFreifahrenReports(reports, container) {
     container.innerHTML = '';
     if (!reports.length) {
-      container.innerHTML = '<div class="board-empty-state">Aktuell liegen keine FreiFahren-Meldungen vor.</div>';
+      container.innerHTML = `<div class="freifahren-empty"><span class="freifahren-empty__icon" aria-hidden="true">✓</span><strong>${escapeHtml(I18N.t('freifahren.emptyTitle'))}</strong><span>${escapeHtml(I18N.t('freifahren.emptyText'))}</span></div>`;
       return;
     }
 
     reports.forEach((report) => {
-      const station = report.station && typeof report.station === 'object'
-        ? report.station.name
-        : report.station;
-      const line = report.line && typeof report.line === 'object'
-        ? (report.line.name || report.line.id || '')
-        : (report.line || report.lineId || '');
-      const direction = report.direction && typeof report.direction === 'object'
-        ? (report.direction.name || report.direction.label || '')
-        : (report.direction || '');
-      const timestamp = report.timestamp ? new Date(report.timestamp) : null;
-      const expiresAt = report.expiresAt ? new Date(report.expiresAt) : null;
-      const dateLabel = timestamp && !Number.isNaN(timestamp.getTime())
-        ? timestamp.toLocaleString(I18N.getLang() === 'en' ? 'en-GB' : 'de-DE')
-        : '';
-      const expiryLabel = expiresAt && !Number.isNaN(expiresAt.getTime())
-        ? (I18N.getLang() === 'en' ? 'Valid until ' : 'Gültig bis ') + expiresAt.toLocaleString(I18N.getLang() === 'en' ? 'en-GB' : 'de-DE')
-        : '';
-      const details = [
-        line ? (I18N.getLang() === 'en' ? 'Line ' : 'Linie ') + line : '',
-        direction ? (I18N.getLang() === 'en' ? 'Towards ' : 'Richtung ') + direction : '',
-        report.isPredicted ? (I18N.getLang() === 'en' ? 'Forecast' : 'Prognose') : '',
-      ].filter(Boolean);
+      const details = getFreifahrenReportDetails(report);
       const card = document.createElement('article');
-      card.className = 'remark-card';
+      card.className = 'freifahren-card';
+      const lineBadge = details.line
+        ? `<span class="freifahren-line" ${details.lineColor ? `style="--freifahren-line-color:${details.lineColor}"` : ''}>${escapeHtml(details.line)}</span>`
+        : '';
+      const tags = [
+        details.direction ? `<span class="freifahren-tag">${escapeHtml(I18N.t('freifahren.direction', { direction: details.direction }))}</span>` : '',
+        report.isPredicted ? `<span class="freifahren-tag freifahren-tag--forecast">${escapeHtml(I18N.t('freifahren.predicted'))}</span>` : '',
+      ].filter(Boolean).join('');
       card.innerHTML = `
-        <div class="notice-item">
-          <span class="notice-item__icon" aria-hidden="true">ℹ</span>
-          <div class="notice-item__body">
-            <strong>${escapeHtml(station || (I18N.getLang() === 'en' ? 'Unknown stop' : 'Unbekannte Haltestelle'))}</strong>
-            <span class="notice-item__text">${escapeHtml(details.join(' · ') || (I18N.getLang() === 'en' ? 'No line or direction details available' : 'Keine Linien- oder Richtungsangaben vorhanden'))}</span>
-            <span class="notice-item__meta">${escapeHtml([dateLabel, expiryLabel].filter(Boolean).join(' · '))}</span>
+        <div class="freifahren-card__accent" aria-hidden="true"></div>
+        <div class="freifahren-card__main">
+          <div class="freifahren-card__top">
+            <span class="freifahren-card__eyebrow">${escapeHtml(I18N.t('freifahren.report'))}</span>
+            ${lineBadge}
+          </div>
+          <h2>${escapeHtml(details.station || I18N.t('freifahren.unknownStation'))}</h2>
+          <div class="freifahren-card__tags">${tags || `<span class="freifahren-tag">${escapeHtml(I18N.t('freifahren.noExtraDetails'))}</span>`}</div>
+          <div class="freifahren-card__bottom">
+            <span>${escapeHtml(details.expiry || details.reportedAt || '')}</span>
+            ${details.reportedAt && details.expiry ? `<span>${escapeHtml(details.reportedAt)}</span>` : ''}
           </div>
         </div>
       `;
       container.appendChild(card);
     });
+  }
+
+  function normalizeFreifahrenMatchValue(value) {
+    return String(value == null ? '' : value)
+      .normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')
+      .toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  function reportMatchesJourney(report, journey) {
+    const details = getFreifahrenReportDetails(report);
+    const reportStationId = report.stationId == null ? '' : String(report.stationId);
+    const reportStation = normalizeFreifahrenMatchValue(details.station);
+    const reportLineId = report.lineId == null
+      ? (report.line && typeof report.line === 'object' && report.line.id != null ? String(report.line.id) : '')
+      : String(report.lineId);
+    const reportLine = normalizeFreifahrenMatchValue(details.line);
+
+    return (journey.legs || []).some((leg) => {
+      const stationIds = [leg.originId, leg.destinationId, leg.origin && leg.origin.id, leg.destination && leg.destination.id]
+        .filter((value) => value != null).map(String);
+      const stationNames = [
+        leg.origin && typeof leg.origin === 'object' ? leg.origin.name : leg.origin,
+        leg.destination && typeof leg.destination === 'object' ? leg.destination.name : leg.destination,
+        leg.originName, leg.destinationName,
+      ].map(normalizeFreifahrenMatchValue).filter(Boolean);
+      const stationMatches = (reportStationId && stationIds.includes(reportStationId))
+        || (reportStation && stationNames.includes(reportStation));
+      if (!stationMatches) return false;
+
+      if (!reportLineId && !reportLine) return true;
+      const legLineId = [leg.lineId, leg.line && typeof leg.line === 'object' ? leg.line.id : '']
+        .filter((value) => value != null && value !== '').map(String);
+      const legLineNames = [
+        leg.line && typeof leg.line === 'object' ? leg.line.name : leg.line,
+        leg.lineName,
+      ].map(normalizeFreifahrenMatchValue).filter(Boolean);
+      return (reportLineId && legLineId.includes(reportLineId))
+        || (reportLine && legLineNames.includes(reportLine));
+    });
+  }
+
+  function renderJourneyFreifahrenCheck(journey, reports) {
+    if (!Array.isArray(reports)) {
+      return `<div class="freifahren-route-check freifahren-route-check--muted"><span aria-hidden="true">ⓘ</span> ${escapeHtml(I18N.t('freifahren.routeUnavailable'))}</div>`;
+    }
+    const matches = reports.filter((report) => reportMatchesJourney(report, journey));
+    if (!matches.length) {
+      return `<div class="freifahren-route-check freifahren-route-check--clear"><span aria-hidden="true">✓</span> ${escapeHtml(I18N.t('freifahren.routeClear'))}</div>`;
+    }
+    const items = matches.slice(0, 3).map((report) => {
+      const details = getFreifahrenReportDetails(report);
+      return `<li><strong>${escapeHtml(details.station || I18N.t('freifahren.unknownStation'))}</strong><span>${escapeHtml([details.line, details.direction ? I18N.t('freifahren.direction', { direction: details.direction }) : ''].filter(Boolean).join(' · '))}</span></li>`;
+    }).join('');
+    return `
+      <div class="freifahren-route-check freifahren-route-check--alert">
+        <div class="freifahren-route-check__heading"><span aria-hidden="true">⚑</span><strong>${escapeHtml(I18N.t('freifahren.routeMatches', { count: matches.length }))}</strong></div>
+        <ul>${items}</ul>
+        <small>${escapeHtml(I18N.t('freifahren.routeDisclaimer'))}</small>
+      </div>
+    `;
+  }
+
+  async function getRouteFreifahrenReports() {
+    try {
+      const data = await fetchFreifahrenReports();
+      return Array.isArray(data.reports) ? data.reports : [];
+    } catch (err) {
+      console.warn('FreiFahren-Routenprüfung nicht verfügbar:', err.message);
+      return null;
+    }
   }
 
   function initJourneyPlanner() {
@@ -1621,11 +1725,14 @@ const App = (() => {
     if (laterBtn) laterBtn.disabled = true;
 
     try {
-      const response = await API.getJourneys(params);
+      const [response, freifahrenReports] = await Promise.all([
+        API.getJourneys(params),
+        getRouteFreifahrenReports(),
+      ]);
       lastJourneyParams = params;
       journeyEarlierRef = response.earlierRef || null;
       journeyLaterRef = response.laterRef || null;
-      renderJourneys(response.journeys, resultsEl);
+      renderJourneys(response.journeys, resultsEl, freifahrenReports);
       updateJourneyLoadMoreButtons();
     } catch (err) {
       showToast(err.message, 'warning');
@@ -1698,10 +1805,13 @@ const App = (() => {
     journeyLaterRef = null;
 
     try {
-      const response = await API.getJourneys(params);
+      const [response, freifahrenReports] = await Promise.all([
+        API.getJourneys(params),
+        getRouteFreifahrenReports(),
+      ]);
       journeyEarlierRef = response.earlierRef || null;
       journeyLaterRef = response.laterRef || null;
-      renderJourneys(response.journeys, resultsEl);
+      renderJourneys(response.journeys, resultsEl, freifahrenReports);
       updateJourneyLoadMoreButtons();
       if (shareRow) shareRow.hidden = false;
     } catch (err) {
@@ -1884,7 +1994,7 @@ const App = (() => {
     });
   }
 
-  function renderJourneys(journeys, container) {
+  function renderJourneys(journeys, container, freifahrenReports = null) {
     container.innerHTML = '';
 
     if (journeys.length === 0) {
@@ -1931,6 +2041,7 @@ const App = (() => {
       card.innerHTML = `
         ${legsHtml}
         ${fareHtml}
+        ${renderJourneyFreifahrenCheck(journey, freifahrenReports)}
         <button class="journey-map-toggle" data-journey-index="${journeyIndex}">🗺️ Streckenverlauf anzeigen</button>
         <div class="journey-mini-map" id="journey-mini-map-${journeyIndex}"></div>
       `;
