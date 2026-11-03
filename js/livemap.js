@@ -128,6 +128,30 @@ const LiveMap = (() => {
     return [...new Set(values.map(normalizeMatchText).filter(Boolean))];
   }
 
+  function getTripPolyline(trip) {
+    if (!trip || typeof trip !== 'object') return null;
+
+    // Je nach Backend-Version kann die Fahrt direkt oder verschachtelt
+    // zurückkommen. Die bekannten Antwortformen werden hier vereinheitlicht.
+    const candidates = [
+      trip.polyline,
+      trip.trip && trip.trip.polyline,
+      trip.journey && trip.journey.polyline,
+      ...(Array.isArray(trip.legs) ? trip.legs.map((leg) => leg && leg.polyline) : []),
+      ...(Array.isArray(trip.trip && trip.trip.legs) ? trip.trip.legs.map((leg) => leg && leg.polyline) : []),
+    ];
+
+    return candidates.find((value) =>
+      (typeof value === 'string' && value.length > 0) ||
+      (Array.isArray(value) && value.length > 0) ||
+      (value && typeof value === 'object' && (
+        typeof value.points === 'string' ||
+        Array.isArray(value.coordinates) ||
+        Array.isArray(value.points)
+      ))
+    ) || null;
+  }
+
   function distanceBetweenCoordinates(a, b) {
     const rad = (value) => value * Math.PI / 180;
     const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
@@ -427,17 +451,45 @@ const LiveMap = (() => {
     routeLayer.clearLayers();
     try {
       const trip = await API.getTrip(vehicle.tripId, { polyline: true });
-      if (trip.polyline) {
-        const latlngs = polylineToLatLngs(trip.polyline);
-        if (latlngs.length > 0) {
-          L.polyline(latlngs, { color: vehicle.color || '#F5A623', weight: 5, opacity: 0.9 }).addTo(routeLayer);
-          // Auf die gesamte Fahrt zoomen, damit weitere Fahrzeuge derselben
-          // Linie im sichtbaren Radar-Ausschnitt liegen.
+      const routePolyline = getTripPolyline(trip);
+      if (routePolyline) {
+        const latlngs = polylineToLatLngs(
+          typeof routePolyline === 'object' && !Array.isArray(routePolyline)
+            ? (routePolyline.points || routePolyline.coordinates)
+            : routePolyline
+        ).filter((point) =>
+          Array.isArray(point) && point.length >= 2 &&
+          Number.isFinite(Number(point[0])) && Number.isFinite(Number(point[1]))
+        );
+
+        if (latlngs.length > 1) {
+          // Dezente Kontur plus Linienfarbe: Route bleibt auch unter Markern
+          // gut sichtbar und wird als eigener Layer dauerhaft gehalten.
+          L.polyline(latlngs, {
+            color: '#17212b',
+            weight: 9,
+            opacity: 0.72,
+            lineCap: 'round',
+            lineJoin: 'round',
+          }).addTo(routeLayer);
+          L.polyline(latlngs, {
+            color: vehicle.color || '#F5A623',
+            weight: 5,
+            opacity: 1,
+            lineCap: 'round',
+            lineJoin: 'round',
+          }).addTo(routeLayer);
+
+          // Auf die gesamte Fahrt zoomen, damit der Verlauf sichtbar ist.
           map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40], maxZoom: 14 });
+        } else {
+          console.warn('Fahrt-Polyline vorhanden, aber keine gültigen Streckenpunkte:', trip);
         }
+      } else {
+        console.warn('Backend hat für diese Fahrt keine Polyline geliefert:', trip);
       }
     } catch (err) {
-      console.error('Trip-Polyline-Fehler:', err.message);
+      console.error('Trip-Polyline-Fehler:', err);
     }
 
     if (radarPollHandle) clearInterval(radarPollHandle);
