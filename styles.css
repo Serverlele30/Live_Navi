@@ -2499,3 +2499,85 @@ html.simple-mode .when-choice { min-height: 46px; }
 }
 
 .journey-share-row { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+
+
+/* FreiFahren – eigene Kategorie und unaufdringlicher Live-Hinweis */
+.freifahren-live-status {
+  margin: 0 0 12px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.freifahren-live-status__label {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--ink-muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .09em;
+}
+.freifahren-live-status__text { display: block; color: var(--ink); }
+.freifahren-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 11px 13px;
+  background: var(--panel-raised);
+  border: var(--border-w) solid var(--line);
+  border-radius: var(--radius);
+}
+.freifahren-toolbar__meta { min-width: 0; color: var(--ink-muted); font-size: 12px; }
+.freifahren-refresh {
+  display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto;
+  border: var(--border-w) solid var(--line); border-radius: var(--radius);
+  background: var(--panel); color: var(--ink); padding: 8px 11px;
+  font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.freifahren-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; }
+.freifahren-card {
+  display: flex; overflow: hidden; min-width: 0;
+  background: var(--panel); border: var(--border-w) solid var(--line);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+}
+.freifahren-card__accent { width: 4px; flex: 0 0 4px; background: var(--signal-amber); }
+.freifahren-card__main { flex: 1; min-width: 0; padding: 14px 15px 12px; }
+.freifahren-card__top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.freifahren-card__eyebrow { color: var(--ink-muted); font-size: 9px; font-weight: 800; letter-spacing: .1em; }
+.freifahren-line {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 30px;
+  padding: 4px 9px; border-radius: 4px;
+  background: var(--freifahren-line-color, var(--signal-amber)); color: #fff;
+  font-family: var(--font-display); font-size: 12px; font-weight: 800;
+}
+.freifahren-card h2 { margin: 0 0 9px; color: var(--ink); font-size: 17px; line-height: 1.25; }
+.freifahren-card__tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.freifahren-tag {
+  display: inline-flex; align-items: center; padding: 5px 8px; border-radius: 4px;
+  background: var(--panel-raised); color: var(--ink-muted); font-size: 11px; line-height: 1.2;
+}
+.freifahren-tag--forecast { background: rgba(208,143,34,.14); color: var(--signal-amber); font-weight: 700; }
+.freifahren-card__bottom { margin-top: 12px; padding-top: 9px; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 10.5px; }
+.freifahren-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 30px 18px;
+  background: var(--panel); border: var(--border-w) solid var(--line); border-radius: var(--radius-lg);
+  text-align: center; color: var(--ink-muted);
+}
+.freifahren-empty__icon {
+  display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(43,155,105,.12); color: #2b9b69; font-size: 21px; font-weight: 800;
+}
+.freifahren-empty strong { color: var(--ink); font-size: 16px; }
+.freifahren-footnote { margin: 14px 2px 0; color: var(--ink-muted); font-size: 11px; line-height: 1.5; }
+@media (max-width: 700px) {
+  .mobile-nav__list { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .mobile-nav__item small { font-size: 7.5px; letter-spacing: -.02em; }
+  .freifahren-toolbar { align-items: flex-start; }
+  .freifahren-toolbar__meta { font-size: 11px; }
+  .freifahren-refresh { padding: 7px 8px; font-size: 11px; }
+}
