@@ -1649,12 +1649,17 @@ const App = (() => {
   }
 
   function renderFreifahrenLiveStatus(message) {
-    const panel = document.getElementById('freifahren-live-status');
-    const text = document.getElementById('freifahren-live-text');
-    if (!panel || !text) return;
-    panel.hidden = !freifahrenLiveTripId;
-    if (!freifahrenLiveTripId) return;
-    text.textContent = message || I18N.t('freifahren.liveChecking');
+    const ids = [
+      ['freifahren-live-status', 'freifahren-live-text'],
+      ['freifahren-category-live-status', 'freifahren-category-live-text'],
+    ];
+    ids.forEach(([panelId, textId]) => {
+      const panel = document.getElementById(panelId);
+      const text = document.getElementById(textId);
+      if (!panel || !text) return;
+      panel.hidden = !freifahrenLiveTripId;
+      if (freifahrenLiveTripId) text.textContent = message || I18N.t('freifahren.liveChecking');
+    });
   }
 
   function initJourneyPlanner() {
