@@ -1931,6 +1931,10 @@ const App = (() => {
       to: journeyTo,
       when: whenInput || undefined,
       arrival: journeyArrivalMode,
+      // Die Geometrie wird schon bei der Suche benötigt, damit Meldungen an
+      // Zwischenstationen (z.B. Wittenbergplatz auf Nollendorfplatz → Zoo)
+      // erkannt werden und nicht nur Meldungen an Start/Ziel.
+      polylines: true,
       results: 5,
       wheelchair: wheelchairToggle ? wheelchairToggle.checked : false,
       bike: bikeToggle ? bikeToggle.checked : false,
