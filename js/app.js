@@ -1810,11 +1810,14 @@ const App = (() => {
     if (laterBtn) laterBtn.disabled = true;
 
     try {
-      const response = await API.getJourneys(params);
+      const [response, freifahrenReports] = await Promise.all([
+        API.getJourneys(params),
+        getFreifahrenReportsForRoute(),
+      ]);
       lastJourneyParams = params;
       journeyEarlierRef = response.earlierRef || null;
       journeyLaterRef = response.laterRef || null;
-      renderJourneys(response.journeys, resultsEl);
+      renderJourneys(response.journeys, resultsEl, freifahrenReports);
       updateJourneyLoadMoreButtons();
     } catch (err) {
       showToast(err.message, 'warning');
@@ -1887,10 +1890,13 @@ const App = (() => {
     journeyLaterRef = null;
 
     try {
-      const response = await API.getJourneys(params);
+      const [response, freifahrenReports] = await Promise.all([
+        API.getJourneys(params),
+        getFreifahrenReportsForRoute(),
+      ]);
       journeyEarlierRef = response.earlierRef || null;
       journeyLaterRef = response.laterRef || null;
-      renderJourneys(response.journeys, resultsEl);
+      renderJourneys(response.journeys, resultsEl, freifahrenReports);
       updateJourneyLoadMoreButtons();
       if (shareRow) shareRow.hidden = false;
     } catch (err) {
@@ -2073,7 +2079,47 @@ const App = (() => {
     });
   }
 
-  function renderJourneys(journeys, container) {
+  async function getFreifahrenReportsForRoute() {
+    try {
+      const data = await fetchFreifahrenReports();
+      return Array.isArray(data.reports) ? data.reports.filter(isReportStillValid) : [];
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function journeyMatchesFreifahrenReport(journey, report) {
+    const details = freifahrenDetails(report);
+    const reportLine = normalizeFreifahrenText(details.line);
+    const reportStation = normalizeFreifahrenText(details.station);
+    return (journey.legs || []).some((leg) => {
+      if (leg.walking) return false;
+      const legLine = normalizeFreifahrenText(leg.line || '');
+      if (reportLine && legLine && reportLine !== legLine) return false;
+      if (details.coords && leg.polyline) {
+        const points = routeGeometry(leg.polyline);
+        const near = closestRouteProgress(details.coords, points);
+        if (near && near.distance <= 450) return true;
+      }
+      const endpoints = [leg.origin, leg.destination].map(normalizeFreifahrenText);
+      return !!reportStation && endpoints.includes(reportStation);
+    });
+  }
+
+  function renderJourneyFreifahrenSummary(journey, reports) {
+    if (!Array.isArray(reports)) return '';
+    const matches = reports.filter((report) => journeyMatchesFreifahrenReport(journey, report));
+    if (!matches.length) {
+      return `<div class="journey-freifahren-note journey-freifahren-note--quiet"><span aria-hidden="true">ⓘ</span> ${escapeHtml(I18N.t('freifahren.routeNoMatch'))}</div>`;
+    }
+    const names = matches.slice(0, 2).map((report) => {
+      const d = freifahrenDetails(report);
+      return [d.line, d.station, d.direction ? I18N.t('freifahren.direction', { direction: d.direction }) : ''].filter(Boolean).join(' · ');
+    });
+    return `<div class="journey-freifahren-note"><span aria-hidden="true">ⓘ</span> ${escapeHtml(I18N.t('freifahren.routeMatch', { count: matches.length, details: names.join(' / ') }))}</div>`;
+  }
+
+  function renderJourneys(journeys, container, freifahrenReports = null) {
     container.innerHTML = '';
 
     if (journeys.length === 0) {
@@ -2120,6 +2166,7 @@ const App = (() => {
       card.innerHTML = `
         ${legsHtml}
         ${fareHtml}
+        ${renderJourneyFreifahrenSummary(journey, freifahrenReports)}
         <button class="journey-map-toggle" data-journey-index="${journeyIndex}">🗺️ Streckenverlauf anzeigen</button>
         <div class="journey-mini-map" id="journey-mini-map-${journeyIndex}"></div>
       `;
