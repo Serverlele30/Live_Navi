@@ -20,6 +20,7 @@ const LiveMap = (() => {
   let radarPollHandle = null;
   let tripPollHandle = null;
   let currentTripId = null;
+  let tripUpdateCallback = null;
   let isolatedMarker = null; // persistenter Marker im Isolations-Modus, wird nur aktualisiert statt neu erzeugt
   let isolatedVehicleMeta = null; // { line, color, textColor } für die Banner-Anzeige
   let getModesParam = () => null; // wird von außen (ModeFilter) gesetzt
@@ -299,6 +300,10 @@ const LiveMap = (() => {
       }
     }
 
+    if (tripUpdateCallback) {
+      tripUpdateCallback({ ...data, tripId: currentTripId });
+    }
+
     if (data.currentLocation) {
       const pos = [data.currentLocation.latitude, data.currentLocation.longitude];
       const popupHtml = `<strong>${data.line || ''}</strong><br>→ ${data.direction || ''}`;
@@ -337,6 +342,7 @@ const LiveMap = (() => {
     }
     currentTripId = null;
     tripMarker = null;
+    if (tripUpdateCallback) tripUpdateCallback(null);
   }
 
   // ---------- Standort ----------
@@ -425,6 +431,9 @@ const LiveMap = (() => {
     startPolling,
     stopPolling,
     trackTrip,
+    setTripUpdateCallback(callback) {
+      tripUpdateCallback = typeof callback === 'function' ? callback : null;
+    },
     setModeFilter,
     clearIsolation,
     locateUser,
