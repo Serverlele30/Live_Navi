@@ -1190,7 +1190,7 @@ const App = (() => {
       loadNearbyDisruptions();
     }
 
-    if (tabName === 'freifahren' && !freifahrenLoadedOnce) {
+    if (tabName === 'freifahren') {
       loadFreifahrenReports();
     }
 
