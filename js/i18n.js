@@ -49,6 +49,7 @@ const I18N = (() => {
       'freifahren.liveForecast': 'Prognose',
       'freifahren.liveDirection': 'Meldungsrichtung: {direction}.',
       'freifahren.liveSameDirection': 'Die Richtungsangabe passt zur Fahrt.',
+      'freifahren.liveOppositePossible': 'Andere Richtungsangabe als deine Fahrt – eine Begegnung ist möglich, aber nicht sicher vorhersagbar.',
       'freifahren.liveDirectionUnknown': 'Die Bewegungsrichtung lässt sich aus den Daten nicht sicher ableiten.',
     
       'nav.more': 'Mehr',
@@ -221,6 +222,7 @@ const I18N = (() => {
       'freifahren.liveForecast': 'Forecast',
       'freifahren.liveDirection': 'Reported direction: {direction}.',
       'freifahren.liveSameDirection': 'The reported direction matches your trip.',
+      'freifahren.liveOppositePossible': 'The reported direction differs from your trip – an encounter is possible, but cannot be predicted with certainty.',
       'freifahren.liveDirectionUnknown': 'Movement direction cannot be determined reliably from the data.',
     
       'nav.more': 'More',
