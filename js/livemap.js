@@ -392,6 +392,7 @@ const LiveMap = (() => {
   function clearIsolation() {
     currentTripId = null;
     isolatedMarker = null;
+    radarLayer.clearLayers();
     radarMarkers.clear();
     isolatedVehicleMeta = null;
     updateIsolationBanner();
