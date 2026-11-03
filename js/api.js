@@ -173,6 +173,11 @@ const API = (() => {
       return request(`/remarks?${qs({ modes, results })}`);
     },
 
+    // Aktuelle FreiFahren-Meldungen aus dem separaten Datenfeed.
+    getFreifahrenReports() {
+      return request('/freifahren/reports');
+    },
+
     getRadar({ north, west, south, east, modes, tripId }) {
       return request(`/radar?${qs({ north, west, south, east, modes, tripId })}`);
     },

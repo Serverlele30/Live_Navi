@@ -24,6 +24,8 @@ const App = (() => {
   let journeyLaterRef = null;
   let lastJourneyParams = null;
   let remarksLoadedOnce = false;
+  let freifahrenLoadedOnce = false;
+  let freifahrenLoading = false;
 
   function loadFavorites() {
     try {
@@ -1180,6 +1182,10 @@ const App = (() => {
       loadNearbyDisruptions();
     }
 
+    if (tabName === 'disruptions' && !freifahrenLoadedOnce) {
+      loadFreifahrenReports();
+    }
+
     if (tabName === 'fares' && !faresLoadedOnce) {
       loadFares();
     }
@@ -1364,6 +1370,97 @@ const App = (() => {
             <strong>${escapeHtml(r.summary || 'Hinweis')}</strong>
             <span class="notice-item__text">${linkifyRemarkText(r.text || '')}</span>
             <span class="notice-item__meta">${escapeHtml(r.company || '')}</span>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  // ---------- FreiFahren-Meldungen ----------
+
+  function initFreifahrenReports() {
+    const refreshButton = document.getElementById('freifahren-refresh');
+    if (!refreshButton) return;
+    refreshButton.addEventListener('click', () => {
+      freifahrenLoadedOnce = false;
+      loadFreifahrenReports();
+    });
+  }
+
+  async function loadFreifahrenReports() {
+    const container = document.getElementById('freifahren-reports-list');
+    const meta = document.getElementById('freifahren-meta');
+    if (!container || freifahrenLoading) return;
+
+    freifahrenLoading = true;
+    container.innerHTML = '<div class="board-empty-state">FreiFahren-Meldungen werden geladen…</div>';
+    try {
+      const data = await API.getFreifahrenReports();
+      const reports = Array.isArray(data.reports) ? data.reports : [];
+      renderFreifahrenReports(reports, container);
+
+      const fetchedAt = data.fetchedAt ? new Date(data.fetchedAt) : null;
+      const fetchedLabel = fetchedAt && !Number.isNaN(fetchedAt.getTime())
+        ? fetchedAt.toLocaleString(I18N.getLang() === 'en' ? 'en-GB' : 'de-DE')
+        : '';
+      const city = data.city ? String(data.city) : '';
+      const count = Number.isFinite(data.count) ? data.count : reports.length;
+      if (meta) {
+        meta.textContent = [
+          city,
+          count + (I18N.getLang() === 'en' ? ' reports' : ' Meldungen'),
+          fetchedLabel ? (I18N.getLang() === 'en' ? 'Updated: ' : 'Stand: ') + fetchedLabel : '',
+        ].filter(Boolean).join(' · ');
+      }
+      freifahrenLoadedOnce = true;
+    } catch (err) {
+      container.innerHTML = `<div class="board-error">⚠ ${escapeHtml(err.message || 'FreiFahren-Daten konnten nicht geladen werden.')}</div>`;
+      if (meta) meta.textContent = '';
+    } finally {
+      freifahrenLoading = false;
+    }
+  }
+
+  function renderFreifahrenReports(reports, container) {
+    container.innerHTML = '';
+    if (!reports.length) {
+      container.innerHTML = '<div class="board-empty-state">Aktuell liegen keine FreiFahren-Meldungen vor.</div>';
+      return;
+    }
+
+    reports.forEach((report) => {
+      const station = report.station && typeof report.station === 'object'
+        ? report.station.name
+        : report.station;
+      const line = report.line && typeof report.line === 'object'
+        ? (report.line.name || report.line.id || '')
+        : (report.line || report.lineId || '');
+      const direction = report.direction && typeof report.direction === 'object'
+        ? (report.direction.name || report.direction.label || '')
+        : (report.direction || '');
+      const timestamp = report.timestamp ? new Date(report.timestamp) : null;
+      const expiresAt = report.expiresAt ? new Date(report.expiresAt) : null;
+      const dateLabel = timestamp && !Number.isNaN(timestamp.getTime())
+        ? timestamp.toLocaleString(I18N.getLang() === 'en' ? 'en-GB' : 'de-DE')
+        : '';
+      const expiryLabel = expiresAt && !Number.isNaN(expiresAt.getTime())
+        ? (I18N.getLang() === 'en' ? 'Valid until ' : 'Gültig bis ') + expiresAt.toLocaleString(I18N.getLang() === 'en' ? 'en-GB' : 'de-DE')
+        : '';
+      const details = [
+        line ? (I18N.getLang() === 'en' ? 'Line ' : 'Linie ') + line : '',
+        direction ? (I18N.getLang() === 'en' ? 'Towards ' : 'Richtung ') + direction : '',
+        report.isPredicted ? (I18N.getLang() === 'en' ? 'Forecast' : 'Prognose') : '',
+      ].filter(Boolean);
+      const card = document.createElement('article');
+      card.className = 'remark-card';
+      card.innerHTML = `
+        <div class="notice-item">
+          <span class="notice-item__icon" aria-hidden="true">ℹ</span>
+          <div class="notice-item__body">
+            <strong>${escapeHtml(station || (I18N.getLang() === 'en' ? 'Unknown stop' : 'Unbekannte Haltestelle'))}</strong>
+            <span class="notice-item__text">${escapeHtml(details.join(' · ') || (I18N.getLang() === 'en' ? 'No line or direction details available' : 'Keine Linien- oder Richtungsangaben vorhanden'))}</span>
+            <span class="notice-item__meta">${escapeHtml([dateLabel, expiryLabel].filter(Boolean).join(' · '))}</span>
           </div>
         </div>
       `;
@@ -1949,6 +2046,7 @@ const App = (() => {
     initJourneyPlanner();
     initNearby();
     initNearbyDisruptions();
+    initFreifahrenReports();
     initNotifications();
     initNotificationsPanel();
     initSettingsPanel();
