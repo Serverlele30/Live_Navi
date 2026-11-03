@@ -96,12 +96,94 @@ const LiveMap = (() => {
     getModesParam = fn;
   }
 
-  function vehicleIcon(label, bg, fg) {
+  function vehicleIcon(label, bg, fg, freifahrenReport = null) {
+    const suspected = !!freifahrenReport;
     return L.divIcon({
-      className: 'vehicle-marker',
-      html: `<span style="background:${bg || '#F5A623'};color:${fg || '#fff'};">${label || '?'}</span>`,
+      className: suspected ? 'vehicle-marker vehicle-marker--freifahren' : 'vehicle-marker',
+      html: `<span style="background:${bg || '#F5A623'};color:${fg || '#fff'};">${label || '?'}</span>${suspected ? '<b class="vehicle-marker__kontrolle" title="Kontrolle vermutet">K</b>' : ''}`,
       iconSize: [null, null],
     });
+  }
+
+  let freifahrenReports = [];
+  let freifahrenReportsFetchedAt = 0;
+  let freifahrenReportsRequest = null;
+
+  function normalizeMatchText(value) {
+    return String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  function distanceBetweenCoordinates(a, b) {
+    const rad = (value) => value * Math.PI / 180;
+    const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+    const x = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+    return 6371000 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+  }
+
+  function getReportMapDetails(report) {
+    const station = report.station && typeof report.station === 'object' ? report.station : {};
+    const line = report.line && typeof report.line === 'object' ? (report.line.name || report.line.id || '') : (report.line || report.lineId || '');
+    const direction = report.direction && typeof report.direction === 'object' ? (report.direction.name || report.direction.label || '') : (report.direction || '');
+    const coordinates = station.coordinates || report.coordinates || {};
+    let lat, lon;
+    if (Array.isArray(coordinates) && coordinates.length >= 2) {
+      lon = Number(coordinates[0]); lat = Number(coordinates[1]);
+    } else {
+      lat = Number(coordinates.latitude ?? coordinates.lat ?? station.latitude ?? report.latitude);
+      lon = Number(coordinates.longitude ?? coordinates.lon ?? coordinates.lng ?? station.longitude ?? report.longitude);
+    }
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if (report.expiresAt && Number.isFinite(new Date(report.expiresAt).getTime()) && new Date(report.expiresAt).getTime() < Date.now()) return null;
+    return { stationName: station.name || report.stationName || 'Meldungsort', line: String(line), direction: String(direction), lat, lon };
+  }
+
+  async function refreshFreifahrenMapReports(force = false) {
+    if (!API.getFreifahrenReports) return freifahrenReports;
+    if (!force && freifahrenReportsFetchedAt && Date.now() - freifahrenReportsFetchedAt < 30000) return freifahrenReports;
+    if (freifahrenReportsRequest) return freifahrenReportsRequest;
+    freifahrenReportsRequest = API.getFreifahrenReports()
+      .then((data) => {
+        freifahrenReports = (Array.isArray(data.reports) ? data.reports : []).filter((report) => !!getReportMapDetails(report));
+        freifahrenReportsFetchedAt = Date.now();
+        return freifahrenReports;
+      })
+      .catch((error) => {
+        console.warn('FreiFahren-Kartenmeldungen konnten nicht geladen werden:', error.message);
+        return freifahrenReports;
+      })
+      .finally(() => { freifahrenReportsRequest = null; });
+    return freifahrenReportsRequest;
+  }
+
+  function findVehicleFreifahrenReport(vehicle) {
+    if (!vehicle || vehicle.latitude == null || vehicle.longitude == null) return null;
+    const vehicleLine = normalizeMatchText(vehicle.line || vehicle.lineName || '');
+    const vehicleDirection = normalizeMatchText(vehicle.direction || '');
+    const position = { lat: Number(vehicle.latitude), lon: Number(vehicle.longitude) };
+    if (!Number.isFinite(position.lat) || !Number.isFinite(position.lon)) return null;
+
+    let best = null;
+    freifahrenReports.forEach((report) => {
+      const details = getReportMapDetails(report);
+      if (!details) return;
+      const reportLine = normalizeMatchText(details.line);
+      if (vehicleLine && reportLine && vehicleLine !== reportLine) return;
+      if (!vehicleLine || !reportLine) return;
+      const reportDirection = normalizeMatchText(details.direction);
+      if (vehicleDirection && reportDirection &&
+          !vehicleDirection.includes(reportDirection) && !reportDirection.includes(vehicleDirection)) return;
+      const distance = distanceBetweenCoordinates(position, { lat: details.lat, lon: details.lon });
+      // Nur Fahrzeuge in unmittelbarer Nähe des gemeldeten Halts markieren.
+      if (distance > 1300) return;
+      if (!best || distance < best.distance) best = { ...details, distance };
+    });
+    return best;
+  }
+
+  function vehiclePopupHtml(v, suspectedReport = null) {
+    const normal = `<strong>${v.line || 'Linie unbekannt'}</strong><br>${v.direction || ''}<br><small>Nächster Halt: ${v.nextStopover || '–'}</small>`;
+    if (!suspectedReport) return normal;
+    return normal + `<br><br><strong>ⓘ Kontrolle vermutet</strong><br><small>Meldung nahe ${suspectedReport.stationName}${suspectedReport.direction ? ' · ' + suspectedReport.direction : ''}</small>`;
   }
 
   function polylineToLatLngs(geojson) {
@@ -134,14 +216,13 @@ const LiveMap = (() => {
       return;
     }
 
+    await refreshFreifahrenMapReports();
     radarLayer.clearLayers();
     data.vehicles.forEach((v) => {
       if (v.latitude == null || v.longitude == null) return;
-      const marker = L.marker([v.latitude, v.longitude], { icon: vehicleIcon(v.line, v.color, v.textColor) });
-      marker.bindPopup(
-        `<strong>${v.line || 'Linie unbekannt'}</strong><br>${v.direction || ''}<br>` +
-          `<small>Nächster Halt: ${v.nextStopover || '–'}</small>`,
-      );
+      const suspectedReport = findVehicleFreifahrenReport(v);
+      const marker = L.marker([v.latitude, v.longitude], { icon: vehicleIcon(v.line, v.color, v.textColor, suspectedReport) });
+      marker.bindPopup(vehiclePopupHtml(v, suspectedReport));
       // Klick auf eine Linie: isoliert sie (alle anderen Fahrzeuge ausblenden,
       // Streckenverlauf einzeichnen, live weiterverfolgen).
       marker.on('click', () => isolateVehicle(v));
@@ -305,11 +386,14 @@ const LiveMap = (() => {
     }
 
     if (data.currentLocation) {
+      await refreshFreifahrenMapReports();
       const pos = [data.currentLocation.latitude, data.currentLocation.longitude];
-      const popupHtml = `<strong>${data.line || ''}</strong><br>→ ${data.direction || ''}`;
+      const tripVehicle = { ...data, latitude: data.currentLocation.latitude, longitude: data.currentLocation.longitude };
+      const suspectedReport = findVehicleFreifahrenReport(tripVehicle);
+      const popupHtml = vehiclePopupHtml(tripVehicle, suspectedReport);
       if (tripMarker) {
         tripMarker.setLatLng(pos);
-        tripMarker.setIcon(vehicleIcon(data.line, data.color, data.textColor));
+        tripMarker.setIcon(vehicleIcon(data.line, data.color, data.textColor, suspectedReport));
         // setPopupContent statt erneutem bindPopup, sonst schließt sich ein
         // gerade geöffnetes Popup bei jedem Poll wieder (gleicher Fehler wie
         // im Isolations-Modus).
