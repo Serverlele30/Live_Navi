@@ -1570,16 +1570,43 @@ const App = (() => {
     return 6371000 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
   }
 
+  // Die VBB-Trip-API liefert den Streckenverlauf als GeoJSON. Je nach
+  // Antwort kann das eine Point-Feature-Sammlung (ein Punkt pro Feature),
+  // eine LineString- oder eine MultiLineString-Geometrie sein. Alle Formen
+  // werden in eine geordnete Punktliste umgewandelt.
   function routeGeometry(polyline) {
-    const features = polyline && Array.isArray(polyline.features) ? polyline.features : [];
     const points = [];
-    features.forEach((feature) => {
-      const coordinates = feature.geometry && feature.geometry.coordinates;
-      if (!Array.isArray(coordinates)) return;
-      coordinates.forEach((pair) => {
-        if (Array.isArray(pair) && pair.length >= 2) points.push({ lat: Number(pair[1]), lon: Number(pair[0]) });
-      });
-    });
+    const addPair = (pair) => {
+      if (!Array.isArray(pair) || pair.length < 2) return;
+      const lon = Number(pair[0]);
+      const lat = Number(pair[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return;
+      const previous = points[points.length - 1];
+      if (previous && Math.abs(previous.lat - lat) < 0.000001 && Math.abs(previous.lon - lon) < 0.000001) return;
+      points.push({ lat, lon });
+    };
+    const addGeometry = (geometry) => {
+      if (!geometry) return;
+      const coordinates = geometry.coordinates;
+      if (geometry.type === 'Point' || (Array.isArray(coordinates) && typeof coordinates[0] === 'number')) {
+        addPair(coordinates);
+      } else if (geometry.type === 'LineString' || (Array.isArray(coordinates) && Array.isArray(coordinates[0]) && typeof coordinates[0][0] === 'number')) {
+        (coordinates || []).forEach(addPair);
+      } else if (geometry.type === 'MultiLineString' || (Array.isArray(coordinates) && Array.isArray(coordinates[0]) && Array.isArray(coordinates[0][0]))) {
+        (coordinates || []).forEach((line) => (line || []).forEach(addPair));
+      } else if (geometry.type === 'GeometryCollection') {
+        (geometry.geometries || []).forEach(addGeometry);
+      }
+    };
+
+    if (polyline && Array.isArray(polyline.features)) {
+      polyline.features.forEach((feature) => addGeometry(feature && feature.geometry));
+    } else if (polyline && polyline.type === 'Feature') {
+      addGeometry(polyline.geometry);
+    } else if (polyline && polyline.type && polyline.coordinates) {
+      addGeometry(polyline);
+    }
+
     let distance = 0;
     points.forEach((point, index) => {
       if (index > 0) distance += distanceMeters(points[index - 1], point);
@@ -1588,12 +1615,32 @@ const App = (() => {
     return points;
   }
 
+  // Projektion auf Streckenabschnitte statt nur auf Stützpunkte. So werden
+  // Haltestellen auch dann erkannt, wenn sie zwischen zwei GeoJSON-Punkten
+  // liegen und der nächste einzelne Punkt weiter entfernt ist.
   function closestRouteProgress(point, route) {
+    if (!point || !Array.isArray(route) || !route.length) return null;
     let closest = null;
-    route.forEach((candidate) => {
-      const distance = distanceMeters(point, candidate);
-      if (!closest || distance < closest.distance) closest = { distance, progress: candidate.progress };
-    });
+    const rad = (value) => value * Math.PI / 180;
+    if (route.length === 1) {
+      const distance = distanceMeters(point, route[0]);
+      return { distance, progress: route[0].progress || 0 };
+    }
+    for (let i = 1; i < route.length; i++) {
+      const a = route[i - 1], b = route[i];
+      const meanLat = rad((a.lat + b.lat + point.lat) / 3);
+      const scaleX = 6371000 * Math.cos(meanLat) * Math.PI / 180;
+      const scaleY = 6371000 * Math.PI / 180;
+      const bx = (b.lon - a.lon) * scaleX, by = (b.lat - a.lat) * scaleY;
+      const px = (point.lon - a.lon) * scaleX, py = (point.lat - a.lat) * scaleY;
+      const lengthSquared = bx * bx + by * by;
+      const t = lengthSquared ? Math.max(0, Math.min(1, (px * bx + py * by) / lengthSquared)) : 0;
+      const projected = { lat: a.lat + (b.lat - a.lat) * t, lon: a.lon + (b.lon - a.lon) * t };
+      const distance = distanceMeters(point, projected);
+      const segmentLength = distanceMeters(a, b);
+      const progress = a.progress + segmentLength * t;
+      if (!closest || distance < closest.distance) closest = { distance, progress };
+    }
     return closest;
   }
 
