@@ -115,6 +115,19 @@ const LiveMap = (() => {
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
   }
 
+
+  function getVehicleLineValues(vehicle) {
+    const line = vehicle && vehicle.line;
+    const values = [
+      typeof line === 'object' && line ? line.name : line,
+      typeof line === 'object' && line ? line.id : '',
+      typeof line === 'object' && line ? line.label : '',
+      vehicle && vehicle.lineName,
+      vehicle && vehicle.lineId,
+    ];
+    return [...new Set(values.map(normalizeMatchText).filter(Boolean))];
+  }
+
   function distanceBetweenCoordinates(a, b) {
     const rad = (value) => value * Math.PI / 180;
     const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
@@ -322,11 +335,12 @@ const LiveMap = (() => {
       return;
     }
 
-    const selectedLine = normalizeMatchText(isolatedVehicleMeta?.line || '');
-    const lineVehicles = (data.vehicles || []).filter((v) =>
-      v.latitude != null && v.longitude != null &&
-      selectedLine && normalizeMatchText(v.line || v.lineName || '') === selectedLine
-    );
+    const selectedLineValues = getVehicleLineValues(isolatedVehicleMeta || {});
+    const lineVehicles = (data.vehicles || []).filter((v) => {
+      if (v.latitude == null || v.longitude == null || !selectedLineValues.length) return false;
+      const candidateValues = getVehicleLineValues(v);
+      return candidateValues.some((value) => selectedLineValues.includes(value));
+    });
 
     await refreshFreifahrenMapReports();
     const visibleKeys = new Set();
@@ -361,19 +375,15 @@ const LiveMap = (() => {
     // Andere Linien bleiben ausgeblendet. Marker der ausgewählten Linie werden
     // nur entfernt, wenn sie in der aktuellen Radarantwort nicht mehr vorkommen.
     radarMarkers.forEach((marker, key) => {
-      if (!visibleKeys.has(key)) {
+      // Den angeklickten Zug auch dann behalten, wenn er kurzzeitig in einer
+      // Radarantwort fehlt. Alle anderen Marker außerhalb der Linie entfernen.
+      if (!visibleKeys.has(key) && marker !== isolatedMarker) {
         if (marker.isPopupOpen()) map.closePopup(marker.getPopup());
         radarLayer.removeLayer(marker);
         radarMarkers.delete(key);
       }
     });
 
-    // Falls die ausgewählte Fahrt vorübergehend nicht in der Radarantwort ist,
-    // ihren letzten Marker stehen lassen statt die Verfolgung zu verlieren.
-    isolatedVehicleMeta = {
-      ...isolatedVehicleMeta,
-      line: isolatedVehicleMeta?.line || '',
-    };
     updateIsolationBanner();
   }
 
@@ -391,7 +401,13 @@ const LiveMap = (() => {
     radarLayer.clearLayers();
     radarMarkers.clear();
 
-    isolatedVehicleMeta = { line: vehicle.line, color: vehicle.color, textColor: vehicle.textColor };
+    isolatedVehicleMeta = {
+      line: vehicle.line,
+      lineId: vehicle.lineId,
+      lineName: vehicle.lineName,
+      color: vehicle.color,
+      textColor: vehicle.textColor,
+    };
     updateIsolationBanner();
 
     // Sofort einen Marker mit den Daten aus dem Klick anzeigen (nicht erst auf
@@ -414,7 +430,10 @@ const LiveMap = (() => {
       if (trip.polyline) {
         const latlngs = polylineToLatLngs(trip.polyline);
         if (latlngs.length > 0) {
-          L.polyline(latlngs, { color: vehicle.color || '#F5A623', weight: 5, opacity: 0.85 }).addTo(routeLayer);
+          L.polyline(latlngs, { color: vehicle.color || '#F5A623', weight: 5, opacity: 0.9 }).addTo(routeLayer);
+          // Auf die gesamte Fahrt zoomen, damit weitere Fahrzeuge derselben
+          // Linie im sichtbaren Radar-Ausschnitt liegen.
+          map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40], maxZoom: 14 });
         }
       }
     } catch (err) {
@@ -422,6 +441,8 @@ const LiveMap = (() => {
     }
 
     if (radarPollHandle) clearInterval(radarPollHandle);
+    // Sofort aktualisieren statt erst zehn Sekunden nach dem Fahrzeugklick.
+    await refreshIsolated();
     radarPollHandle = setInterval(refreshIsolated, 10000);
   }
 
