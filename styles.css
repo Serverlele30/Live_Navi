@@ -777,6 +777,18 @@ button {
   white-space: nowrap;
   box-shadow: 0 0 0 2px var(--bg-void);
 }
+.vehicle-marker--selected span {
+  position: relative;
+  z-index: 2;
+  outline: 3px solid var(--signal-amber);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 2px var(--bg-void), 0 0 14px 5px rgba(245, 166, 35, .8);
+  animation: live-vehicle-pulse 1.8s ease-out infinite;
+}
+@keyframes live-vehicle-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
 .vehicle-marker--freifahren span {
   outline: 2px solid #e5484d;
   outline-offset: 2px;
