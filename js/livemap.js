@@ -307,41 +307,73 @@ const LiveMap = (() => {
 
     let data;
     try {
+      // Im Isolationsmodus nicht nur die ausgewählte Fahrt abfragen, sondern
+      // alle Fahrzeuge im Kartenausschnitt. Anschließend wird auf dieselbe
+      // Linienbezeichnung wie beim angeklickten Fahrzeug eingeschränkt.
       data = await API.getRadar({
         north: bounds.getNorth().toFixed(5),
         west: bounds.getWest().toFixed(5),
         south: bounds.getSouth().toFixed(5),
         east: bounds.getEast().toFixed(5),
-        tripId: currentTripId,
+        modes: getModesParam(),
       });
     } catch (err) {
-      console.error('Radar-Fehler (isoliert):', err.message);
+      console.error('Radar-Fehler (Linienverfolgung):', err.message);
       return;
     }
 
-    const v = data.vehicles[0];
-    if (!v || v.latitude == null || v.longitude == null) {
-      // Fahrzeug gerade nicht meldend (z.B. kurzzeitig aus der Live-Erfassung) -
-      // Marker stehen lassen statt zu entfernen, nächster Poll aktualisiert ihn wieder.
-      return;
-    }
+    const selectedLine = normalizeMatchText(isolatedVehicleMeta?.line || '');
+    const lineVehicles = (data.vehicles || []).filter((v) =>
+      v.latitude != null && v.longitude != null &&
+      selectedLine && normalizeMatchText(v.line || v.lineName || '') === selectedLine
+    );
 
-    // WICHTIG: Marker wird wiederverwendet statt bei jedem Poll neu erzeugt zu
-    // werden. Vorher wurde hier radarLayer.clearLayers() + ein komplett neuer
-    // Marker angelegt - das hat ein ggf. geöffnetes Popup jedes Mal geschlossen,
-    // sodass die Fahrzeuginfo (Richtung, nächster Halt) nach dem ersten Klick nie
-    // wieder aktualisiert im UI sichtbar wurde.
-    if (isolatedMarker) {
-      isolatedMarker.setLatLng([v.latitude, v.longitude]);
-      isolatedMarker.setIcon(vehicleIcon(v.line, v.color, v.textColor));
-      isolatedMarker.setPopupContent(vehiclePopupHtml(v));
-    } else {
-      isolatedMarker = L.marker([v.latitude, v.longitude], { icon: vehicleIcon(v.line, v.color, v.textColor) });
-      isolatedMarker.bindPopup(vehiclePopupHtml(v));
-      isolatedMarker.addTo(radarLayer);
-    }
+    await refreshFreifahrenMapReports();
+    const visibleKeys = new Set();
 
-    isolatedVehicleMeta = { line: v.line, color: v.color, textColor: v.textColor };
+    lineVehicles.forEach((v) => {
+      const markerKey = String(v.tripId || v.vehicleId || v.id || [
+        v.line || '', v.direction || '', v.nextStopover || '',
+      ].join('|'));
+      visibleKeys.add(markerKey);
+      const suspectedReport = findVehicleFreifahrenReport(v);
+      const popupHtml = vehiclePopupHtml(v, suspectedReport, false);
+      let marker = radarMarkers.get(markerKey);
+
+      if (marker) {
+        marker.setLatLng([v.latitude, v.longitude]);
+        marker.setIcon(vehicleIcon(v.line, v.color, v.textColor, suspectedReport));
+        marker.setPopupContent(popupHtml);
+        marker._liveNaviVehicle = v;
+      } else {
+        marker = L.marker([v.latitude, v.longitude], {
+          icon: vehicleIcon(v.line, v.color, v.textColor, suspectedReport),
+        });
+        marker.bindPopup(popupHtml, { maxWidth: 300, autoClose: false, closeOnClick: false });
+        marker._liveNaviVehicle = v;
+        marker.addTo(radarLayer);
+        radarMarkers.set(markerKey, marker);
+      }
+
+      if (v.tripId === currentTripId) isolatedMarker = marker;
+    });
+
+    // Andere Linien bleiben ausgeblendet. Marker der ausgewählten Linie werden
+    // nur entfernt, wenn sie in der aktuellen Radarantwort nicht mehr vorkommen.
+    radarMarkers.forEach((marker, key) => {
+      if (!visibleKeys.has(key)) {
+        if (marker.isPopupOpen()) map.closePopup(marker.getPopup());
+        radarLayer.removeLayer(marker);
+        radarMarkers.delete(key);
+      }
+    });
+
+    // Falls die ausgewählte Fahrt vorübergehend nicht in der Radarantwort ist,
+    // ihren letzten Marker stehen lassen statt die Verfolgung zu verlieren.
+    isolatedVehicleMeta = {
+      ...isolatedVehicleMeta,
+      line: isolatedVehicleMeta?.line || '',
+    };
     updateIsolationBanner();
   }
 
@@ -365,12 +397,16 @@ const LiveMap = (() => {
     // Sofort einen Marker mit den Daten aus dem Klick anzeigen (nicht erst auf
     // den ersten Poll warten) und direkt öffnen, damit man die Fahrzeuginfo
     // ohne weiteren Klick sieht.
+    const selectedMarkerKey = String(vehicle.tripId || vehicle.vehicleId || vehicle.id || [
+      vehicle.line || '', vehicle.direction || '', vehicle.nextStopover || '',
+    ].join('|'));
     isolatedMarker = L.marker([vehicle.latitude, vehicle.longitude], {
       icon: vehicleIcon(vehicle.line, vehicle.color, vehicle.textColor),
     });
-    isolatedMarker.bindPopup(vehiclePopupHtml(vehicle));
+    isolatedMarker.bindPopup(vehiclePopupHtml(vehicle), { maxWidth: 300, autoClose: false, closeOnClick: false });
     isolatedMarker.addTo(radarLayer);
     isolatedMarker.openPopup();
+    radarMarkers.set(selectedMarkerKey, isolatedMarker);
 
     routeLayer.clearLayers();
     try {
