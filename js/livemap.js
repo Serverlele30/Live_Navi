@@ -98,10 +98,13 @@ const LiveMap = (() => {
     getModesParam = fn;
   }
 
-  function vehicleIcon(label, bg, fg, freifahrenReport = null) {
+  function vehicleIcon(label, bg, fg, freifahrenReport = null, selected = false) {
     const suspected = !!freifahrenReport;
+    const classes = ['vehicle-marker'];
+    if (suspected) classes.push('vehicle-marker--freifahren');
+    if (selected) classes.push('vehicle-marker--selected');
     return L.divIcon({
-      className: suspected ? 'vehicle-marker vehicle-marker--freifahren' : 'vehicle-marker',
+      className: classes.join(' '),
       html: `<span style="background:${bg || '#F5A623'};color:${fg || '#fff'};">${label || '?'}</span>${suspected ? '<b class="vehicle-marker__kontrolle" title="Kontrolle vermutet">K</b>' : ''}`,
       iconSize: [null, null],
     });
@@ -288,7 +291,7 @@ const LiveMap = (() => {
         // setLatLng bewegt denselben Leaflet-Marker; ein geöffnetes Popup
         // bleibt daran verankert und wandert mit dem Fahrzeug mit.
         marker.setLatLng([v.latitude, v.longitude]);
-        marker.setIcon(vehicleIcon(v.line, v.color, v.textColor, suspectedReport));
+        marker.setIcon(vehicleIcon(v.line, v.color, v.textColor, suspectedReport, v.tripId === currentTripId));
         marker.setPopupContent(popupHtml);
         marker._liveNaviVehicle = v;
       } else {
@@ -385,7 +388,7 @@ const LiveMap = (() => {
         marker._liveNaviVehicle = v;
       } else {
         marker = L.marker([v.latitude, v.longitude], {
-          icon: vehicleIcon(v.line, v.color, v.textColor, suspectedReport),
+          icon: vehicleIcon(v.line, v.color, v.textColor, suspectedReport, v.tripId === currentTripId),
         });
         marker.bindPopup(popupHtml, { maxWidth: 300, autoClose: false, closeOnClick: false });
         marker._liveNaviVehicle = v;
@@ -441,7 +444,7 @@ const LiveMap = (() => {
       vehicle.line || '', vehicle.direction || '', vehicle.nextStopover || '',
     ].join('|'));
     isolatedMarker = L.marker([vehicle.latitude, vehicle.longitude], {
-      icon: vehicleIcon(vehicle.line, vehicle.color, vehicle.textColor),
+      icon: vehicleIcon(vehicle.line, vehicle.color, vehicle.textColor, null, true),
     });
     isolatedMarker.bindPopup(vehiclePopupHtml(vehicle), { maxWidth: 300, autoClose: false, closeOnClick: false });
     isolatedMarker.addTo(radarLayer);
