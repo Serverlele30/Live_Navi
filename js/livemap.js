@@ -180,20 +180,33 @@ const LiveMap = (() => {
     return best;
   }
 
-  function vehiclePopupHtml(v, suspectedReport = null) {
-    const normal = `<strong>${v.line || 'Linie unbekannt'}</strong><br>${v.direction || ''}<br><small>Nächster Halt: ${v.nextStopover || '–'}</small>`;
-    if (!suspectedReport) return normal;
-    return normal + `<br><br><strong>ⓘ Kontrolle vermutet</strong><br><small>Meldung nahe ${suspectedReport.stationName}${suspectedReport.direction ? ' · ' + suspectedReport.direction : ''}</small>`;
+  function escapePopupText(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[char]));
   }
 
-  function polylineToLatLngs(geojson) {
-    if (!geojson || !geojson.features) return [];
-    return geojson.features.map((f) => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
-  }
-
-  function vehiclePopupHtml(v) {
-    return `<strong>${v.line || 'Linie unbekannt'}</strong><br>${v.direction || ''}<br>` +
-      `<small>Nächster Halt: ${v.nextStopover || '–'}</small>`;
+  function vehiclePopupHtml(v, suspectedReport = null, showTrackButton = false) {
+    const line = escapePopupText(v.line || 'Linie unbekannt');
+    const direction = escapePopupText(v.direction || 'Fahrtrichtung nicht verfügbar');
+    const nextStop = escapePopupText(v.nextStopover || 'Keine Angabe');
+    const modeLabel = escapePopupText(v.mode || v.product || v.type || '');
+    const coordinates = Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude))
+      ? `${Number(v.latitude).toFixed(5)}, ${Number(v.longitude).toFixed(5)}`
+      : '';
+    const rows = [
+      modeLabel ? `<div class="vehicle-popup__row"><span>Verkehrsmittel</span><strong>${modeLabel}</strong></div>` : '',
+      `<div class="vehicle-popup__row"><span>Fahrtrichtung</span><strong>${direction}</strong></div>`,
+      `<div class="vehicle-popup__row"><span>Nächster Halt</span><strong>${nextStop}</strong></div>`,
+      coordinates ? `<div class="vehicle-popup__row"><span>Position</span><strong>${coordinates}</strong></div>` : '',
+    ].filter(Boolean).join('');
+    const kontrolle = suspectedReport
+      ? `<div class="vehicle-popup__notice"><strong>ⓘ Kontrolle vermutet</strong><span>Meldung nahe ${escapePopupText(suspectedReport.stationName)}${suspectedReport.direction ? ' · ' + escapePopupText(suspectedReport.direction) : ''}</span></div>`
+      : '';
+    const trackButton = showTrackButton && v.tripId
+      ? '<button type="button" class="vehicle-popup__track">Fahrt live verfolgen</button>'
+      : '';
+    return `<div class="vehicle-popup"><div class="vehicle-popup__heading">${line}</div>${rows}${kontrolle}${trackButton}</div>`;
   }
 
   // ---------- Radar-Modus (Standard: alle Fahrzeuge im Ausschnitt) ----------
@@ -222,10 +235,13 @@ const LiveMap = (() => {
       if (v.latitude == null || v.longitude == null) return;
       const suspectedReport = findVehicleFreifahrenReport(v);
       const marker = L.marker([v.latitude, v.longitude], { icon: vehicleIcon(v.line, v.color, v.textColor, suspectedReport) });
-      marker.bindPopup(vehiclePopupHtml(v, suspectedReport));
-      // Klick auf eine Linie: isoliert sie (alle anderen Fahrzeuge ausblenden,
-      // Streckenverlauf einzeichnen, live weiterverfolgen).
-      marker.on('click', () => isolateVehicle(v));
+      marker.bindPopup(vehiclePopupHtml(v, suspectedReport, true), { maxWidth: 280 });
+      // Der Marker-Klick öffnet jetzt zuerst die Fahrzeuginformationen.
+      // Erst die Schaltfläche im Popup startet die isolierte Live-Verfolgung.
+      marker.on('popupopen', () => {
+        const button = marker.getPopup()?.getElement()?.querySelector('.vehicle-popup__track');
+        if (button) button.addEventListener('click', () => isolateVehicle(v), { once: true });
+      });
       marker.addTo(radarLayer);
     });
   }
