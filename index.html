@@ -51,6 +51,7 @@
       <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-favorites" id="tab-favorites" tabindex="-1" data-tab="favorites"><span class="tab-button__icon" aria-hidden="true">★</span> <span data-i18n="favorites.title">Favoriten</span></button>
       <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-journey" id="tab-journey" tabindex="-1" data-tab="journey"><span class="tab-button__icon" aria-hidden="true">🧭</span> <span data-i18n="nav.route">Route</span></button>
       <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-map" id="tab-map" tabindex="-1" data-tab="map"><span class="tab-button__icon" aria-hidden="true">🗺</span> <span data-i18n="nav.map">Karte</span></button>
+      <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-freifahren" id="tab-freifahren" tabindex="-1" data-tab="freifahren"><span class="tab-button__icon" aria-hidden="true">🎫</span> <span data-i18n="nav.freifahren">FreiFahren</span></button>
       <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-disruptions" id="tab-disruptions" tabindex="-1" data-tab="disruptions"><span class="tab-button__icon" aria-hidden="true">⚠</span> <span data-i18n="disruptions.title">Störungen</span></button>
       <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-more" id="tab-more" tabindex="-1" data-tab="more"><span class="tab-button__icon" aria-hidden="true">☰</span> <span data-i18n="nav.more">Mehr</span></button>
     </div>
@@ -206,16 +207,27 @@
         <div id="remarks-list" class="remarks-list" aria-live="polite"><div class="board-empty-state" data-i18n="disruptions.loading">Störungsmeldungen werden geladen…</div></div>
       </div>
 
-      <div class="disruption-section">
-        <div class="section-heading">
-          <div><h2 data-i18n="disruptions.freifahrenTitle">FreiFahren-Meldungen</h2></div>
-          <button id="freifahren-refresh" class="location-btn" type="button" data-i18n="disruptions.freifahrenRefresh">↻ Aktualisieren</button>
-        </div>
-        <p id="freifahren-meta" class="notice-item__meta" aria-live="polite"></p>
-        <div id="freifahren-reports-list" class="remarks-list" aria-live="polite">
-          <div class="board-empty-state" data-i18n="disruptions.freifahrenLoading">FreiFahren-Meldungen werden geladen…</div>
+    </section>
+
+    <section class="tab-panel" data-tab-panel="freifahren" id="panel-freifahren" role="tabpanel" aria-labelledby="tab-freifahren mobile-tab-freifahren" tabindex="-1" hidden>
+      <div class="panel-heading">
+        <div>
+          <span class="section-heading__eyebrow" data-i18n="freifahren.eyebrow">LIVE-REPORTS</span>
+          <h1 data-i18n="freifahren.title">FreiFahren</h1>
+          <p data-i18n="freifahren.text">Aktuelle Meldungen auf einen Blick – und automatisch passend zu deinen Verbindungen geprüft.</p>
         </div>
       </div>
+      <div class="freifahren-toolbar">
+        <div class="freifahren-toolbar__status">
+          <span class="freifahren-live-dot" aria-hidden="true"></span>
+          <span id="freifahren-meta" aria-live="polite" data-i18n="freifahren.loading">Meldungen werden geladen…</span>
+        </div>
+        <button id="freifahren-refresh" class="freifahren-refresh" type="button"><span aria-hidden="true">↻</span> <span data-i18n="freifahren.refresh">Aktualisieren</span></button>
+      </div>
+      <div id="freifahren-reports-list" class="freifahren-list" aria-live="polite">
+        <div class="board-empty-state" data-i18n="freifahren.loading">Meldungen werden geladen…</div>
+      </div>
+      <p class="freifahren-footnote" data-i18n="freifahren.disclaimer">Die Hinweise basieren auf dem aktuell verfügbaren Meldungsfeed und können unvollständig sein.</p>
     </section>
 
     <section class="tab-panel" data-tab-panel="fares" hidden>
@@ -298,6 +310,7 @@
       <button class="mobile-nav__item" role="tab" aria-selected="false" aria-controls="panel-favorites" id="mobile-tab-favorites" tabindex="-1" data-tab="favorites"><span aria-hidden="true">★</span><small data-i18n="favorites.title">Favoriten</small></button>
       <button class="mobile-nav__item" role="tab" aria-selected="false" aria-controls="panel-journey" id="mobile-tab-journey" tabindex="-1" data-tab="journey"><span aria-hidden="true">🧭</span><small data-i18n="nav.route">Route</small></button>
       <button class="mobile-nav__item" role="tab" aria-selected="false" aria-controls="panel-map" id="mobile-tab-map" tabindex="-1" data-tab="map"><span aria-hidden="true">🗺</span><small data-i18n="nav.map">Karte</small></button>
+      <button class="mobile-nav__item" role="tab" aria-selected="false" aria-controls="panel-freifahren" id="mobile-tab-freifahren" tabindex="-1" data-tab="freifahren"><span aria-hidden="true">🎫</span><small data-i18n="nav.freifahren">FreiFahren</small></button>
       <button class="mobile-nav__item" role="tab" aria-selected="false" aria-controls="panel-disruptions" id="mobile-tab-disruptions" tabindex="-1" data-tab="disruptions"><span aria-hidden="true">⚠</span><small data-i18n="disruptions.title">Störungen</small></button>
       <button class="mobile-nav__item" role="tab" aria-selected="false" aria-controls="panel-more" id="mobile-tab-more" tabindex="-1" data-tab="more"><span aria-hidden="true">☰</span><small data-i18n="nav.more">Mehr</small></button>
     </div>
