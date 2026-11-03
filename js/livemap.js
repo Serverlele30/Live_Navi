@@ -393,12 +393,12 @@ const LiveMap = (() => {
 
       if (marker) {
         marker.setLatLng([v.latitude, v.longitude]);
-        marker.setIcon(vehicleIcon(v.line, v.color, v.textColor, suspectedReport, v.tripId === currentTripId));
+        marker.setIcon(vehicleIcon(getVehicleDisplayLine(v), v.color, v.textColor, suspectedReport));
         marker.setPopupContent(popupHtml);
         marker._liveNaviVehicle = v;
       } else {
         marker = L.marker([v.latitude, v.longitude], {
-          icon: vehicleIcon(v.line, v.color, v.textColor, suspectedReport, v.tripId === currentTripId),
+          icon: vehicleIcon(getVehicleDisplayLine(v), v.color, v.textColor, suspectedReport),
         });
         marker.bindPopup(popupHtml, { maxWidth: 300, autoClose: false, closeOnClick: false });
         marker._liveNaviVehicle = v;
@@ -545,14 +545,14 @@ const LiveMap = (() => {
       const popupHtml = vehiclePopupHtml(tripVehicle, suspectedReport);
       if (tripMarker) {
         tripMarker.setLatLng(pos);
-        tripMarker.setIcon(vehicleIcon(data.line, data.color, data.textColor, suspectedReport));
+        tripMarker.setIcon(vehicleIcon(getVehicleDisplayLine(data), data.color, data.textColor, suspectedReport));
         // setPopupContent statt erneutem bindPopup, sonst schließt sich ein
         // gerade geöffnetes Popup bei jedem Poll wieder (gleicher Fehler wie
         // im Isolations-Modus).
         if (tripMarker.getPopup()) tripMarker.setPopupContent(popupHtml);
         else tripMarker.bindPopup(popupHtml);
       } else {
-        tripMarker = L.marker(pos, { icon: vehicleIcon(data.line, data.color, data.textColor) }).addTo(routeLayer);
+        tripMarker = L.marker(pos, { icon: vehicleIcon(getVehicleDisplayLine(data), data.color, data.textColor) }).addTo(routeLayer);
         tripMarker.bindPopup(popupHtml);
       }
     }
