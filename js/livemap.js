@@ -98,13 +98,10 @@ const LiveMap = (() => {
     getModesParam = fn;
   }
 
-  function vehicleIcon(label, bg, fg, freifahrenReport = null, selected = false) {
+  function vehicleIcon(label, bg, fg, freifahrenReport = null) {
     const suspected = !!freifahrenReport;
-    const classes = ['vehicle-marker'];
-    if (suspected) classes.push('vehicle-marker--freifahren');
-    if (selected) classes.push('vehicle-marker--selected');
     return L.divIcon({
-      className: classes.join(' '),
+      className: suspected ? 'vehicle-marker vehicle-marker--freifahren' : 'vehicle-marker',
       html: `<span style="background:${bg || '#F5A623'};color:${fg || '#fff'};">${label || '?'}</span>${suspected ? '<b class="vehicle-marker__kontrolle" title="Kontrolle vermutet">K</b>' : ''}`,
       iconSize: [null, null],
     });
@@ -118,6 +115,19 @@ const LiveMap = (() => {
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
   }
 
+
+  function getVehicleDisplayLine(vehicle) {
+    if (!vehicle) return '';
+    const line = vehicle.line;
+    const candidates = [
+      typeof line === 'object' && line ? line.name : '',
+      typeof line === 'object' && line ? line.label : '',
+      vehicle.lineName,
+      typeof line === 'string' || typeof line === 'number' ? line : '',
+    ];
+    const value = candidates.find((item) => item != null && String(item).trim() !== '');
+    return value == null ? '' : String(value).trim();
+  }
 
   function getVehicleLineValues(vehicle) {
     const line = vehicle && vehicle.line;
@@ -229,7 +239,7 @@ const LiveMap = (() => {
   }
 
   function vehiclePopupHtml(v, suspectedReport = null, showTrackButton = false) {
-    const line = escapePopupText(v.line || 'Linie unbekannt');
+    const line = escapePopupText(getVehicleDisplayLine(v) || 'Linie unbekannt');
     const direction = escapePopupText(v.direction || 'Fahrtrichtung nicht verfügbar');
     const nextStop = escapePopupText(v.nextStopover || 'Keine Angabe');
     const modeLabel = escapePopupText(v.mode || v.product || v.type || '');
@@ -291,12 +301,12 @@ const LiveMap = (() => {
         // setLatLng bewegt denselben Leaflet-Marker; ein geöffnetes Popup
         // bleibt daran verankert und wandert mit dem Fahrzeug mit.
         marker.setLatLng([v.latitude, v.longitude]);
-        marker.setIcon(vehicleIcon(v.line, v.color, v.textColor, suspectedReport, v.tripId === currentTripId));
+        marker.setIcon(vehicleIcon(getVehicleDisplayLine(v), v.color, v.textColor, suspectedReport));
         marker.setPopupContent(popupHtml);
         marker._liveNaviVehicle = v;
       } else {
         marker = L.marker([v.latitude, v.longitude], {
-          icon: vehicleIcon(v.line, v.color, v.textColor, suspectedReport),
+          icon: vehicleIcon(getVehicleDisplayLine(v), v.color, v.textColor, suspectedReport),
         });
         marker.bindPopup(popupHtml, { maxWidth: 300, autoClose: false, closeOnClick: false });
         marker._liveNaviVehicle = v;
@@ -444,7 +454,7 @@ const LiveMap = (() => {
       vehicle.line || '', vehicle.direction || '', vehicle.nextStopover || '',
     ].join('|'));
     isolatedMarker = L.marker([vehicle.latitude, vehicle.longitude], {
-      icon: vehicleIcon(vehicle.line, vehicle.color, vehicle.textColor, null, true),
+      icon: vehicleIcon(getVehicleDisplayLine(vehicle), vehicle.color, vehicle.textColor),
     });
     isolatedMarker.bindPopup(vehiclePopupHtml(vehicle), { maxWidth: 300, autoClose: false, closeOnClick: false });
     isolatedMarker.addTo(radarLayer);
@@ -454,45 +464,19 @@ const LiveMap = (() => {
     routeLayer.clearLayers();
     try {
       const trip = await API.getTrip(vehicle.tripId, { polyline: true });
-      const routePolyline = getTripPolyline(trip);
-      if (routePolyline) {
-        const latlngs = polylineToLatLngs(
-          typeof routePolyline === 'object' && !Array.isArray(routePolyline)
-            ? (routePolyline.points || routePolyline.coordinates)
-            : routePolyline
-        ).filter((point) =>
-          Array.isArray(point) && point.length >= 2 &&
-          Number.isFinite(Number(point[0])) && Number.isFinite(Number(point[1]))
-        );
-
-        if (latlngs.length > 1) {
-          // Dezente Kontur plus Linienfarbe: Route bleibt auch unter Markern
-          // gut sichtbar und wird als eigener Layer dauerhaft gehalten.
-          L.polyline(latlngs, {
-            color: '#17212b',
-            weight: 9,
-            opacity: 0.72,
-            lineCap: 'round',
-            lineJoin: 'round',
-          }).addTo(routeLayer);
+      if (trip.polyline) {
+        const latlngs = polylineToLatLngs(trip.polyline);
+        if (latlngs.length > 0) {
           L.polyline(latlngs, {
             color: vehicle.color || '#F5A623',
             weight: 5,
-            opacity: 1,
-            lineCap: 'round',
-            lineJoin: 'round',
+            opacity: 0.85,
           }).addTo(routeLayer);
-
-          // Auf die gesamte Fahrt zoomen, damit der Verlauf sichtbar ist.
           map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40], maxZoom: 14 });
-        } else {
-          console.warn('Fahrt-Polyline vorhanden, aber keine gültigen Streckenpunkte:', trip);
         }
-      } else {
-        console.warn('Backend hat für diese Fahrt keine Polyline geliefert:', trip);
       }
     } catch (err) {
-      console.error('Trip-Polyline-Fehler:', err);
+      console.error('Trip-Polyline-Fehler:', err.message);
     }
 
     if (radarPollHandle) clearInterval(radarPollHandle);
@@ -520,7 +504,7 @@ const LiveMap = (() => {
     }
     const lineEl = document.getElementById('map-isolation-line');
     if (lineEl) {
-      lineEl.textContent = isolatedVehicleMeta.line || '?';
+      lineEl.textContent = getVehicleDisplayLine(isolatedVehicleMeta) || '?';
       lineEl.style.background = isolatedVehicleMeta.color || '#F5A623';
       lineEl.style.color = isolatedVehicleMeta.textColor || '#fff';
     }
