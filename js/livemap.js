@@ -110,7 +110,7 @@ const LiveMap = (() => {
   let freifahrenReportsRequest = null;
 
   function normalizeMatchText(value) {
-    return String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
   }
 
   function distanceBetweenCoordinates(a, b) {
