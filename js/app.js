@@ -32,6 +32,8 @@ const App = (() => {
   let freifahrenLiveTimer = null;
   let freifahrenLiveTripId = null;
   let freifahrenLiveTripData = null;
+  let freifahrenLiveLastUpdate = 0;
+  let freifahrenLiveExpiresAt = 0;
 
   function loadFavorites() {
     try {
@@ -1503,8 +1505,34 @@ const App = (() => {
     });
   }
 
+  function beginFreifahrenLiveTracking(tripId) {
+    freifahrenLiveTripId = tripId;
+    freifahrenLiveTripData = null;
+    freifahrenLiveLastUpdate = 0;
+    freifahrenLiveExpiresAt = Date.now() + (3 * 60 * 60 * 1000);
+    renderFreifahrenLiveStatus(I18N.t('freifahren.liveChecking'));
+    if (!freifahrenLiveTimer) freifahrenLiveTimer = setInterval(refreshFreifahrenLiveStatus, 30000);
+    refreshFreifahrenLiveStatus();
+  }
+
   function handleFreifahrenTripUpdate(data) {
+    // Das Karten-Tracking kann beim Wechsel in einen anderen Tab pausieren.
+    // Die FreiFahren-Prüfung läuft unabhängig davon für die begonnene Fahrt weiter.
     if (!data || !data.tripId) {
+      freifahrenLiveLastUpdate = 0;
+      return;
+    }
+    freifahrenLiveTripId = data.tripId;
+    freifahrenLiveTripData = { ...freifahrenLiveTripData, ...data };
+    freifahrenLiveLastUpdate = Date.now();
+    if (!freifahrenLiveExpiresAt) freifahrenLiveExpiresAt = Date.now() + (3 * 60 * 60 * 1000);
+    renderFreifahrenLiveStatus(null);
+    if (!freifahrenLiveTimer) freifahrenLiveTimer = setInterval(refreshFreifahrenLiveStatus, 30000);
+  }
+
+  async function refreshFreifahrenLiveStatus() {
+    if (!freifahrenLiveTripId) return;
+    if (freifahrenLiveExpiresAt && Date.now() > freifahrenLiveExpiresAt) {
       freifahrenLiveTripId = null;
       freifahrenLiveTripData = null;
       if (freifahrenLiveTimer) clearInterval(freifahrenLiveTimer);
@@ -1512,20 +1540,23 @@ const App = (() => {
       renderFreifahrenLiveStatus(null);
       return;
     }
-    freifahrenLiveTripId = data.tripId;
-    freifahrenLiveTripData = data;
-    renderFreifahrenLiveStatus(null);
-    if (!freifahrenLiveTimer) {
-      refreshFreifahrenLiveStatus();
-      freifahrenLiveTimer = setInterval(refreshFreifahrenLiveStatus, 30000);
-    }
-  }
 
-  async function refreshFreifahrenLiveStatus() {
-    if (!freifahrenLiveTripData || !freifahrenLiveTripId) return;
     try {
-      const data = await fetchFreifahrenReports(true);
-      const reports = (Array.isArray(data.reports) ? data.reports : []).filter(isReportStillValid);
+      // Falls die Karte nicht sichtbar ist, liefert dieser eigene Abruf trotzdem
+      // eine frische Fahrzeugposition. Bei aktivem Karten-Tracking kommt sie
+      // bereits alle 10 Sekunden über den LiveMap-Callback.
+      if (!freifahrenLiveTripData || Date.now() - freifahrenLiveLastUpdate > 20000) {
+        const freshTrip = await API.getTrip(freifahrenLiveTripId, { polyline: true });
+        freifahrenLiveTripData = {
+          ...(freifahrenLiveTripData || {}),
+          ...freshTrip,
+          tripId: freifahrenLiveTripId,
+          polyline: freshTrip.polyline || (freifahrenLiveTripData && freifahrenLiveTripData.polyline),
+        };
+        freifahrenLiveLastUpdate = Date.now();
+      }
+      const reportData = await fetchFreifahrenReports(true);
+      const reports = (Array.isArray(reportData.reports) ? reportData.reports : []).filter(isReportStillValid);
       renderFreifahrenLiveStatus(buildFreifahrenRouteForecast(reports, freifahrenLiveTripData));
     } catch (_) {
       renderFreifahrenLiveStatus(I18N.t('freifahren.liveUnavailable'));
@@ -1600,7 +1631,9 @@ const App = (() => {
       ? I18N.t('freifahren.liveDirection', { direction: first.details.direction })
       : '';
     const forecast = first.details.predicted ? I18N.t('freifahren.liveForecast') : I18N.t('freifahren.livePossible');
-    const relative = first.directionMatch ? I18N.t('freifahren.liveSameDirection') : I18N.t('freifahren.liveDirectionUnknown');
+    const relative = first.direction && tripDirection
+      ? (first.directionMatch ? I18N.t('freifahren.liveSameDirection') : I18N.t('freifahren.liveOppositePossible'))
+      : I18N.t('freifahren.liveDirectionUnknown');
     return I18N.t('freifahren.liveAhead', {
       station: first.details.station,
       line: first.details.line || trip.line || '',
@@ -2096,6 +2129,7 @@ const App = (() => {
       });
       card.querySelectorAll('.leg-track-btn[data-action="live"]').forEach((btn) => {
         btn.addEventListener('click', () => {
+          beginFreifahrenLiveTracking(btn.dataset.tripId);
           LiveMap.trackTrip(btn.dataset.tripId);
           activateTab('map');
         });
