@@ -26,6 +26,12 @@ const App = (() => {
   let remarksLoadedOnce = false;
   let freifahrenLoadedOnce = false;
   let freifahrenLoading = false;
+  let freifahrenReportsCache = null;
+  let freifahrenReportsFetchedAt = 0;
+  let freifahrenReportsRequest = null;
+  let freifahrenLiveTimer = null;
+  let freifahrenLiveTripId = null;
+  let freifahrenLiveTripData = null;
 
   function loadFavorites() {
     try {
@@ -1182,7 +1188,7 @@ const App = (() => {
       loadNearbyDisruptions();
     }
 
-    if (tabName === 'disruptions' && !freifahrenLoadedOnce) {
+    if (tabName === 'freifahren' && !freifahrenLoadedOnce) {
       loadFreifahrenReports();
     }
 
@@ -1377,95 +1383,245 @@ const App = (() => {
     });
   }
 
-  // ---------- FreiFahren-Meldungen ----------
+  // ---------- FreiFahren: eigene Kategorie + stille Live-Routenprüfung ----------
 
   function initFreifahrenReports() {
     const refreshButton = document.getElementById('freifahren-refresh');
-    if (!refreshButton) return;
-    refreshButton.addEventListener('click', () => {
-      freifahrenLoadedOnce = false;
-      loadFreifahrenReports();
-    });
+    if (refreshButton) refreshButton.addEventListener('click', () => loadFreifahrenReports(true));
+    LiveMap.setTripUpdateCallback(handleFreifahrenTripUpdate);
   }
 
-  async function loadFreifahrenReports() {
+  async function fetchFreifahrenReports(force = false) {
+    if (force) {
+      freifahrenReportsCache = null;
+      freifahrenReportsFetchedAt = 0;
+    }
+    if (freifahrenReportsCache && Date.now() - freifahrenReportsFetchedAt < 30000) return freifahrenReportsCache;
+    if (freifahrenReportsRequest) return freifahrenReportsRequest;
+    freifahrenReportsRequest = API.getFreifahrenReports()
+      .then((data) => {
+        freifahrenReportsCache = data;
+        freifahrenReportsFetchedAt = Date.now();
+        return data;
+      })
+      .finally(() => { freifahrenReportsRequest = null; });
+    return freifahrenReportsRequest;
+  }
+
+  async function loadFreifahrenReports(force = false) {
     const container = document.getElementById('freifahren-reports-list');
     const meta = document.getElementById('freifahren-meta');
     if (!container || freifahrenLoading) return;
-
     freifahrenLoading = true;
-    container.innerHTML = '<div class="board-empty-state">FreiFahren-Meldungen werden geladen…</div>';
+    if (force) freifahrenLoadedOnce = false;
+    container.innerHTML = `<div class="board-empty board-loading"><span class="spinner" aria-hidden="true"></span> ${escapeHtml(I18N.t('freifahren.loading'))}</div>`;
     try {
-      const data = await API.getFreifahrenReports();
-      const reports = Array.isArray(data.reports) ? data.reports : [];
+      const data = await fetchFreifahrenReports(force);
+      const reports = Array.isArray(data.reports) ? data.reports.filter(isReportStillValid) : [];
       renderFreifahrenReports(reports, container);
-
       const fetchedAt = data.fetchedAt ? new Date(data.fetchedAt) : null;
       const fetchedLabel = fetchedAt && !Number.isNaN(fetchedAt.getTime())
-        ? fetchedAt.toLocaleString(I18N.getLang() === 'en' ? 'en-GB' : 'de-DE')
+        ? fetchedAt.toLocaleTimeString(I18N.getLang() === 'en' ? 'en-GB' : 'de-DE', { hour: '2-digit', minute: '2-digit' })
         : '';
-      const city = data.city ? String(data.city) : '';
-      const count = Number.isFinite(data.count) ? data.count : reports.length;
-      if (meta) {
-        meta.textContent = [
-          city,
-          count + (I18N.getLang() === 'en' ? ' reports' : ' Meldungen'),
-          fetchedLabel ? (I18N.getLang() === 'en' ? 'Updated: ' : 'Stand: ') + fetchedLabel : '',
-        ].filter(Boolean).join(' · ');
-      }
+      const count = reports.length;
+      if (meta) meta.textContent = [
+        data.city || '',
+        I18N.t('freifahren.count', { count }),
+        fetchedLabel ? I18N.t('freifahren.updated', { time: fetchedLabel }) : '',
+      ].filter(Boolean).join(' · ');
       freifahrenLoadedOnce = true;
     } catch (err) {
-      container.innerHTML = `<div class="board-error">⚠ ${escapeHtml(err.message || 'FreiFahren-Daten konnten nicht geladen werden.')}</div>`;
-      if (meta) meta.textContent = '';
+      container.innerHTML = `<div class="board-empty-state">${escapeHtml(I18N.t('freifahren.error'))}</div>`;
+      if (meta) meta.textContent = I18N.t('freifahren.error');
     } finally {
       freifahrenLoading = false;
     }
   }
 
+  function isReportStillValid(report) {
+    if (!report.expiresAt) return true;
+    const expiry = new Date(report.expiresAt).getTime();
+    return !Number.isFinite(expiry) || expiry >= Date.now();
+  }
+
+  function freifahrenDetails(report) {
+    const stationObject = report.station && typeof report.station === 'object' ? report.station : null;
+    const station = stationObject ? stationObject.name : report.station;
+    const lineObject = report.line && typeof report.line === 'object' ? report.line : null;
+    const line = lineObject ? (lineObject.name || lineObject.id || '') : (report.line || report.lineId || '');
+    const directionObject = report.direction && typeof report.direction === 'object' ? report.direction : null;
+    const direction = directionObject ? (directionObject.name || directionObject.label || '') : (report.direction || '');
+    const expiresAt = report.expiresAt ? new Date(report.expiresAt) : null;
+    const reportedAt = report.timestamp ? new Date(report.timestamp) : null;
+    const lineColor = lineObject && /^#[0-9a-f]{6}$/i.test(lineObject.color || '') ? lineObject.color : '';
+    return {
+      station: station || I18N.t('freifahren.unknownStation'),
+      line: String(line || ''),
+      direction: String(direction || ''),
+      lineId: String(report.lineId || (lineObject && lineObject.id) || ''),
+      stationId: String(report.stationId || (stationObject && stationObject.id) || ''),
+      lineColor,
+      predicted: !!report.isPredicted,
+      expiry: expiresAt && Number.isFinite(expiresAt.getTime()) ? expiresAt : null,
+      timestamp: reportedAt && Number.isFinite(reportedAt.getTime()) ? reportedAt : null,
+      coords: getFreifahrenCoordinates(report),
+    };
+  }
+
+  function getFreifahrenCoordinates(report) {
+    const station = report.station && typeof report.station === 'object' ? report.station : {};
+    const coords = station.coordinates || report.coordinates || {};
+    if (Array.isArray(coords) && coords.length >= 2) return { lat: Number(coords[1]), lon: Number(coords[0]) };
+    const lat = Number(coords.latitude ?? coords.lat ?? station.latitude ?? report.latitude);
+    const lon = Number(coords.longitude ?? coords.lon ?? coords.lng ?? station.longitude ?? report.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
+  }
+
   function renderFreifahrenReports(reports, container) {
     container.innerHTML = '';
     if (!reports.length) {
-      container.innerHTML = '<div class="board-empty-state">Aktuell liegen keine FreiFahren-Meldungen vor.</div>';
+      container.innerHTML = `<div class="freifahren-empty"><span class="freifahren-empty__icon" aria-hidden="true">✓</span><strong>${escapeHtml(I18N.t('freifahren.emptyTitle'))}</strong><span>${escapeHtml(I18N.t('freifahren.emptyText'))}</span></div>`;
       return;
     }
-
     reports.forEach((report) => {
-      const station = report.station && typeof report.station === 'object'
-        ? report.station.name
-        : report.station;
-      const line = report.line && typeof report.line === 'object'
-        ? (report.line.name || report.line.id || '')
-        : (report.line || report.lineId || '');
-      const direction = report.direction && typeof report.direction === 'object'
-        ? (report.direction.name || report.direction.label || '')
-        : (report.direction || '');
-      const timestamp = report.timestamp ? new Date(report.timestamp) : null;
-      const expiresAt = report.expiresAt ? new Date(report.expiresAt) : null;
-      const dateLabel = timestamp && !Number.isNaN(timestamp.getTime())
-        ? timestamp.toLocaleString(I18N.getLang() === 'en' ? 'en-GB' : 'de-DE')
-        : '';
-      const expiryLabel = expiresAt && !Number.isNaN(expiresAt.getTime())
-        ? (I18N.getLang() === 'en' ? 'Valid until ' : 'Gültig bis ') + expiresAt.toLocaleString(I18N.getLang() === 'en' ? 'en-GB' : 'de-DE')
-        : '';
-      const details = [
-        line ? (I18N.getLang() === 'en' ? 'Line ' : 'Linie ') + line : '',
-        direction ? (I18N.getLang() === 'en' ? 'Towards ' : 'Richtung ') + direction : '',
-        report.isPredicted ? (I18N.getLang() === 'en' ? 'Forecast' : 'Prognose') : '',
-      ].filter(Boolean);
+      const d = freifahrenDetails(report);
       const card = document.createElement('article');
-      card.className = 'remark-card';
+      card.className = 'freifahren-card';
+      const line = d.line ? `<span class="freifahren-line" ${d.lineColor ? `style="--freifahren-line-color:${d.lineColor}"` : ''}>${escapeHtml(d.line)}</span>` : '';
+      const direction = d.direction ? `<span class="freifahren-tag">${escapeHtml(I18N.t('freifahren.direction', { direction: d.direction }))}</span>` : '';
+      const predicted = d.predicted ? `<span class="freifahren-tag freifahren-tag--forecast">${escapeHtml(I18N.t('freifahren.predicted'))}</span>` : '';
+      const time = d.expiry ? I18N.t('freifahren.validUntil', { time: d.expiry.toLocaleTimeString(I18N.getLang() === 'en' ? 'en-GB' : 'de-DE', { hour: '2-digit', minute: '2-digit' }) }) : '';
       card.innerHTML = `
-        <div class="notice-item">
-          <span class="notice-item__icon" aria-hidden="true">ℹ</span>
-          <div class="notice-item__body">
-            <strong>${escapeHtml(station || (I18N.getLang() === 'en' ? 'Unknown stop' : 'Unbekannte Haltestelle'))}</strong>
-            <span class="notice-item__text">${escapeHtml(details.join(' · ') || (I18N.getLang() === 'en' ? 'No line or direction details available' : 'Keine Linien- oder Richtungsangaben vorhanden'))}</span>
-            <span class="notice-item__meta">${escapeHtml([dateLabel, expiryLabel].filter(Boolean).join(' · '))}</span>
-          </div>
-        </div>
-      `;
+        <div class="freifahren-card__accent" aria-hidden="true"></div>
+        <div class="freifahren-card__main">
+          <div class="freifahren-card__top"><span class="freifahren-card__eyebrow">${escapeHtml(I18N.t('freifahren.report'))}</span>${line}</div>
+          <h2>${escapeHtml(d.station)}</h2>
+          <div class="freifahren-card__tags">${direction}${predicted}</div>
+          <div class="freifahren-card__bottom"><span>${escapeHtml(time || (d.timestamp ? d.timestamp.toLocaleTimeString(I18N.getLang() === 'en' ? 'en-GB' : 'de-DE', { hour: '2-digit', minute: '2-digit' }) : ''))}</span></div>
+        </div>`;
       container.appendChild(card);
     });
+  }
+
+  function handleFreifahrenTripUpdate(data) {
+    if (!data || !data.tripId) {
+      freifahrenLiveTripId = null;
+      freifahrenLiveTripData = null;
+      if (freifahrenLiveTimer) clearInterval(freifahrenLiveTimer);
+      freifahrenLiveTimer = null;
+      renderFreifahrenLiveStatus(null);
+      return;
+    }
+    freifahrenLiveTripId = data.tripId;
+    freifahrenLiveTripData = data;
+    renderFreifahrenLiveStatus(null);
+    if (!freifahrenLiveTimer) {
+      refreshFreifahrenLiveStatus();
+      freifahrenLiveTimer = setInterval(refreshFreifahrenLiveStatus, 30000);
+    }
+  }
+
+  async function refreshFreifahrenLiveStatus() {
+    if (!freifahrenLiveTripData || !freifahrenLiveTripId) return;
+    try {
+      const data = await fetchFreifahrenReports(true);
+      const reports = (Array.isArray(data.reports) ? data.reports : []).filter(isReportStillValid);
+      renderFreifahrenLiveStatus(buildFreifahrenRouteForecast(reports, freifahrenLiveTripData));
+    } catch (_) {
+      renderFreifahrenLiveStatus(I18N.t('freifahren.liveUnavailable'));
+    }
+  }
+
+  function distanceMeters(a, b) {
+    const rad = (v) => v * Math.PI / 180;
+    const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+    const x = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+    return 6371000 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+  }
+
+  function routeGeometry(polyline) {
+    const features = polyline && Array.isArray(polyline.features) ? polyline.features : [];
+    const points = [];
+    features.forEach((feature) => {
+      const coordinates = feature.geometry && feature.geometry.coordinates;
+      if (!Array.isArray(coordinates)) return;
+      coordinates.forEach((pair) => {
+        if (Array.isArray(pair) && pair.length >= 2) points.push({ lat: Number(pair[1]), lon: Number(pair[0]) });
+      });
+    });
+    let distance = 0;
+    points.forEach((point, index) => {
+      if (index > 0) distance += distanceMeters(points[index - 1], point);
+      point.progress = distance;
+    });
+    return points;
+  }
+
+  function closestRouteProgress(point, route) {
+    let closest = null;
+    route.forEach((candidate) => {
+      const distance = distanceMeters(point, candidate);
+      if (!closest || distance < closest.distance) closest = { distance, progress: candidate.progress };
+    });
+    return closest;
+  }
+
+  function buildFreifahrenRouteForecast(reports, trip) {
+    const route = routeGeometry(trip.polyline);
+    const current = trip.currentLocation && {
+      lat: Number(trip.currentLocation.latitude),
+      lon: Number(trip.currentLocation.longitude),
+    };
+    if (route.length < 2 || !current || !Number.isFinite(current.lat) || !Number.isFinite(current.lon)) {
+      return I18N.t('freifahren.liveWaiting');
+    }
+    const currentProgress = closestRouteProgress(current, route);
+    if (!currentProgress || currentProgress.distance > 1500) return I18N.t('freifahren.liveWaiting');
+
+    const tripLine = normalizeFreifahrenText(trip.line || '');
+    const tripDirection = normalizeFreifahrenText(trip.direction || '');
+    const candidates = reports.map((report) => {
+      const details = freifahrenDetails(report);
+      if (!details.coords) return null;
+      const reportLine = normalizeFreifahrenText(details.line);
+      if (tripLine && reportLine && tripLine !== reportLine) return null;
+      const projected = closestRouteProgress(details.coords, route);
+      if (!projected || projected.distance > 450) return null;
+      const aheadMeters = projected.progress - currentProgress.progress;
+      if (aheadMeters < 250 || aheadMeters > 18000) return null;
+      const direction = normalizeFreifahrenText(details.direction);
+      return { details, aheadMeters, direction, directionMatch: !!(direction && tripDirection && (direction.includes(tripDirection) || tripDirection.includes(direction))) };
+    }).filter(Boolean).sort((a, b) => a.aheadMeters - b.aheadMeters);
+
+    if (!candidates.length) return I18N.t('freifahren.liveClear');
+    const first = candidates[0];
+    const km = (first.aheadMeters / 1000).toFixed(1).replace('.', ',');
+    const directionNote = first.details.direction
+      ? I18N.t('freifahren.liveDirection', { direction: first.details.direction })
+      : '';
+    const forecast = first.details.predicted ? I18N.t('freifahren.liveForecast') : I18N.t('freifahren.livePossible');
+    const relative = first.directionMatch ? I18N.t('freifahren.liveSameDirection') : I18N.t('freifahren.liveDirectionUnknown');
+    return I18N.t('freifahren.liveAhead', {
+      station: first.details.station,
+      line: first.details.line || trip.line || '',
+      km,
+      forecast,
+      directionNote,
+      relative,
+    });
+  }
+
+  function normalizeFreifahrenText(value) {
+    return String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  function renderFreifahrenLiveStatus(message) {
+    const panel = document.getElementById('freifahren-live-status');
+    const text = document.getElementById('freifahren-live-text');
+    if (!panel || !text) return;
+    panel.hidden = !freifahrenLiveTripId;
+    if (!freifahrenLiveTripId) return;
+    text.textContent = message || I18N.t('freifahren.liveChecking');
   }
 
   function initJourneyPlanner() {
